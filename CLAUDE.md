@@ -58,12 +58,19 @@ Una entidad, un repositorio, un servicio, un controlador. Nombres:
 | `DATE` | `LocalDate` |
 | `TIMESTAMPTZ` | `OffsetDateTime` — nunca `LocalDateTime` |
 | `CHAR(3)` | `String` |
+| `CHAR(3)` | `String` + `@JdbcTypeCode(SqlTypes.CHAR)` |
+| `JSONB` | `String` + `@JdbcTypeCode(SqlTypes.JSON)` |
+| `INET` | `String` + `@JdbcTypeCode(SqlTypes.INET)` |
 
-Los diagramas de clase dicen `Long` y `LocalDateTime` en varios sitios.
-**Están desactualizados.** La fuente de verdad es
+Las tres últimas necesitan `@JdbcTypeCode` porque el tipo JDBC que Hibernate
+infiere por defecto no coincide con el de la columna y `validate` lo rechaza.
+Los imports son `org.hibernate.annotations.JdbcTypeCode` y
+`org.hibernate.type.SqlTypes`.
+
+Ante cualquier discrepancia entre un diagrama y la base, **manda el SQL**:
 `src/main/resources/db/migration/V1__esquema_inicial.sql`.
-La única columna `BIGSERIAL` es `log_auditoria.id_log`.
-
+La única columna `BIGSERIAL` es `log_auditoria.id_log`; todas las demás
+claves primarias son `SERIAL` → `Integer`.
 ### Enums
 
 Persisten como texto, no como número ordinal:
@@ -72,15 +79,24 @@ exactamente con los del `CHECK` de la tabla.
 
 ## Mapeos especiales de este modelo
 
-- **`huesped`, `anfitrion` y `admin`**: NO uses `@Inheritance`. Un mismo
-  usuario puede ser huésped y anfitrión a la vez, y la herencia de JPA no
-  lo permite. Son entidades propias con `@OneToOne @MapsId` hacia `Usuario`.
+## Mapeos especiales de este modelo
+
+- **`huesped`, `anfitrion`, `admin`**: comparten PK con `usuario` →
+  `@OneToOne` con `@MapsId`. NO uses `@Inheritance`: un mismo usuario puede
+  ser huésped y anfitrión a la vez.
+- **`cancelacion` y `resena`**: tienen FK propia `id_reserva UNIQUE`, no PK
+  compartida → `@OneToOne` normal, **sin** `@MapsId`.
 - **`publicacion_servicio`**: tabla puente sin atributos →
-  `@ManyToMany` con `@JoinTable`.
-- **`detalle_servicio_reserva`**: tabla puente **con** atributos y clave
-  primaria compuesta → entidad propia con `@EmbeddedId`.
-- **`reserva`**: tiene FK compuesta `(id_publicacion, id_alojamiento)`
-  hacia `publicacion`. Respétala.
+  `@ManyToMany` con `@JoinTable`. No es una entidad.
+- **`detalle_servicio_reserva`**: tabla puente con atributos y PK compuesta →
+  entidad con `@EmbeddedId` y una clase `@Embeddable` para la clave.
+  La clase embebida lleva `equals` y `hashCode`: es requisito de JPA.
+- **`reserva` y su FK compuesta** `(id_publicacion, id_alojamiento)`:
+  mapea `alojamiento` y `publicacion` como **dos `@ManyToOne`
+  independientes**, cada uno dueño de su columna. No uses `@JoinColumns`
+  con columna compartida: Hibernate no permite mezclar `insertable` ni
+  `nullable` entre columnas de una misma asociación. La FK compuesta la
+  sigue imponiendo la base, que es quien manda.
 
 ## DTO
 
@@ -114,10 +130,8 @@ docker compose up -d       # levantar PostgreSQL (hazlo antes de arrancar)
 
 ## Cómo trabajar conmigo
 
-- Una entidad por vez. No generes varias en una sola pasada.
-- No agregues dependencias al `pom.xml` sin preguntarme primero.
-- No refactorices código que no te pedí tocar.
-- Si una regla de negocio no está en el DDL ni en este archivo, pregúntame.
-  No la inventes.
-- Después de cada entidad, corre `./mvnw clean verify` y repórtame el
-  resultado antes de seguir.
+## Estado actual
+
+Las 20 entidades y los enums existen y pasan `validate`.
+Pendiente: métodos de negocio en las entidades, repositorios, servicios,
+controladores, DTO y el manejador global de excepciones.
