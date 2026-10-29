@@ -57,3 +57,6 @@ desktop.ini
 # La configuracion compartida del equipo (.claude/settings.json, comandos,
 # hooks) SI se versiona.
 .claude/settings.local.json
+
+# Frontend: Node que descarga frontend-maven-plugin
+frontend/node/
