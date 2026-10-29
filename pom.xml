@@ -86,6 +86,45 @@
 
 	<build>
 		<plugins>
+				<!--Compila el frontend (React + Vite) dentro del build de Maven.
+    				Descarga su propio Node, ejecuta npm ci y npm run build, y Vite
+    				deja el resultado en target/classes/static. Asi ./mvnw clean verify
+    				produce un solo jar con backend y frontend (ADR 0001, SCRUM-60).-->
+			<plugin>
+				<groupId>com.github.eirslett</groupId>
+				<artifactId>frontend-maven-plugin</artifactId>
+				<version>2.0.2</version>
+				<configuration>
+					<workingDirectory>frontend</workingDirectory>
+					<nodeVersion>v26.13.0</nodeVersion>
+				</configuration>
+				<executions>
+					<execution>
+						<id>instalar-node-y-npm</id>
+						<goals>
+							<goal>install-node-and-npm</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>npm-ci</id>
+						<goals>
+							<goal>npm</goal>
+						</goals>
+						<configuration>
+							<arguments>ci</arguments>
+						</configuration>
+					</execution>
+					<execution>
+						<id>compilar-frontend</id>
+						<goals>
+							<goal>npm</goal>
+						</goals>
+						<configuration>
+							<arguments>run build</arguments>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
