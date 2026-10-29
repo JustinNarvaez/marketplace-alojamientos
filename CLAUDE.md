@@ -111,7 +111,10 @@ exactamente con los del `CHECK` de la tabla.
 La sección 7 del enunciado exige una aplicación web desacoplada que consuma
 los servicios REST, con el framework que elija el equipo. Decisiones tomadas:
 
-- **React**, en la carpeta `frontend/` de este mismo repositorio.
+- **React con TypeScript**, en la carpeta `frontend/` de este mismo
+  repositorio, con **Vite** como herramienta de construcción.
+- **MUI (Material UI)** como librería de componentes y tema visual. No se
+  escribe CSS a mano salvo que ningun componente de MUI resuelva el caso.
 - El frontend se compila y se sirve desde Spring Boot: **un solo artefacto
   desplegable**. No hay despliegue separado, no hay CORS que configurar.
 - El frontend **solo** habla con la API REST. Nunca accede a la base de datos.
@@ -124,9 +127,20 @@ los servicios REST, con el framework que elija el equipo. Decisiones tomadas:
 - **Cada historia funcional incluye su pantalla.** Una historia no está
   terminada solo con el endpoint.
 
-Pendiente de decidir en SCRUM-60: herramienta de construcción del frontend,
-librería de componentes y la forma exacta de empaquetarlo dentro del build
-de Maven. Hasta que eso esté resuelto, no generes código de frontend.
+Empaquetado: el plugin `frontend-maven-plugin` descarga Node y npm durante
+el build de Maven, compila el frontend y deja el resultado en los recursos
+estáticos de Spring Boot. `./mvnw clean verify` produce un solo jar con todo
+adentro, y el pipeline de CI no necesita un paso aparte de Node.
+
+Dos consecuencias que hay que respetar al programar:
+
+- Spring devuelve `index.html` para cualquier ruta que no empiece por `/api`,
+  para que recargar una ruta del frontend en el navegador no dé 404.
+- En desarrollo, el servidor de Vite reenvía `/api` al backend en el 8080.
+  Para el navegador es el mismo origen, así que no hay CORS que configurar.
+
+Decisión registrada en `docs/arquitectura/adr/0001-stack-y-empaquetado-del-frontend.md`.
+Pendiente en SCRUM-22 y SCRUM-23: cómo se mantiene la sesión del usuario.
 
 ## Base de datos
 
