@@ -51,7 +51,7 @@ export function ProveedorSesion({children}: {children: ReactNode}) {
     return <SesionContext.Provider value={valor}>{children}</SesionContext.Provider>
 }
 
-export function useSesion(): ValorSesion {
+export function usarSesion(): ValorSesion {
     const valor = useContext(SesionContext)
     if (!valor) {
         throw new Error('usarSesion debe usarse dentro de ProveedorSesion')

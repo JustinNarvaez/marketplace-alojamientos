@@ -43,7 +43,7 @@ async function mensajeDe(respuesta: Response): Promise<string> {
     } catch {
         //La respuesta no trae JSON: se usa el mesaje por estado
     }
-    return MENSAJES[respuesta.status] ?? 'Ocurrio un error. Intenta más tarde'
+    return MENSAJES[respuesta.status] ?? 'Ocurrió un error. Intenta más tarde'
 }
 
 export async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
