@@ -90,6 +90,36 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
+
+			<!--
+				Mide que porcentaje del codigo ejecutan las pruebas.
+				El Quality Gate de SonarQube Cloud exige 80% de cobertura
+				sobre el codigo nuevo de cada Pull Request; sin este reporte
+				Sonar lo interpreta como 0% y bloquea el PR.
+
+				Sin <version>: la hereda de spring-boot-starter-parent, que
+				fija la version de JaCoCo probada con esta version de Spring
+				Boot y de Java. No la fijamos a mano.
+			-->
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>preparar-agente</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>reporte</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 
