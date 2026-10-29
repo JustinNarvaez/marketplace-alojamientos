@@ -173,6 +173,9 @@ Pendiente en SCRUM-22 y SCRUM-23: cómo se mantiene la sesión del usuario.
 docker compose up -d       # levantar PostgreSQL (hazlo antes de arrancar)
 ./mvnw spring-boot:run     # arrancar la aplicación
 ./mvnw clean verify        # compilar y correr pruebas
+
+cd frontend && npm run dev                              # frontend en desarrollo: http://localhost:5173
+./mvnw spring-boot:run -Dskip.installnodenpm -Dskip.npm # backend sin recompilar el frontend
 ```
 
 ## Cómo trabajar conmigo
@@ -192,8 +195,15 @@ docker compose up -d       # levantar PostgreSQL (hazlo antes de arrancar)
 
 - `main` tiene las 20 entidades, los 9 enums y el slice vertical completo de
   `Servicio` (entidad, repositorio, servicio, controlador y DTO).
-- El pipeline de integración continua existe y se ejecuta en cada Pull
-  Request (SCRUM-62, SCRUM-63). Pendiente de merge.
-- Pendiente: base del frontend (SCRUM-60), métodos de negocio en las
-  entidades, repositorios/servicios/controladores del resto del modelo,
-  manejador global de excepciones y medición de cobertura con JaCoCo.
+- El pipeline de integración continua se ejecuta en cada Pull Request
+  (SCRUM-62, SCRUM-63).
+- La base del frontend existe (SCRUM-60): React con TypeScript, Vite y MUI en
+  `frontend/`, compilado por Maven y servido por Spring Boot. Incluye el
+  cliente HTTP (`api/cliente.ts`), el contexto de sesión, las rutas protegidas
+  por rol, el layout base y el tema con la paleta crema.
+- La sesión vive en memoria hasta que SCRUM-22/23 definan cómo se mantiene.
+  `IniciarSesion` tiene botones para simular un rol **solo en desarrollo**;
+  se eliminan cuando exista el login real.
+- Pendiente: métodos de negocio en las entidades,
+  repositorios/servicios/controladores del resto del modelo y manejador
+  global de excepciones.

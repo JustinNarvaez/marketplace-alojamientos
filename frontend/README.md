@@ -1,32 +1,26 @@
-# React + TypeScript + Vite
+# Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React con TypeScript, Vite y MUI. Decisión registrada en
+`docs/arquitectura/adr/0001-stack-y-empaquetado-del-frontend.md`.
 
-Currently, two official plugins are available:
+## Desarrollo
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Con el backend corriendo en el 8080:
 
-## React Compiler
+    npm run dev
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Abre http://localhost:5173. Vite reenvía `/api` al backend, así que no hay CORS.
 
-## Expanding the Oxlint configuration
+## Build
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+No hace falta compilarlo a mano: `./mvnw clean verify` lo compila y lo deja
+dentro del jar.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
+## Estructura
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+- `src/api/cliente.ts`: único punto de contacto con la API REST.
+- `src/sesion/`: contexto de sesión y roles.
+- `src/rutas/RutaProtegida.tsx`: protección de rutas por rol.
+- `src/layout/LayoutBase.tsx`: barra de navegación y contenedor común.
+- `src/tema/tema.ts`: paleta del proyecto.
+- `src/paginas/`: una página por pantalla.
