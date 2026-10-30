@@ -20,17 +20,44 @@ interface ValorSesion{
     tieneRol: (rol: Rol) => boolean
 }
 
+const CLAVE_SESION = 'marketplace.sesion'
+
+interface SesionGuardada {
+    usuario: UsuarioSesion
+    token: string
+}
+
+// Se lee una sola vez, al montar ProveedorSesion, para que recargar la
+// pagina (F5) no cierre la sesion (el token vive en memoria en cliente.ts).
+function leerSesionGuardada(): SesionGuardada | null {
+    try {
+        const bruto = localStorage.getItem(CLAVE_SESION)
+        return bruto ? JSON.parse(bruto) as SesionGuardada : null
+    } catch {
+        return null
+    }
+}
+
 const SesionContext = createContext<ValorSesion | null>(null)
 
 export function ProveedorSesion({children}: {children: ReactNode}) {
-    const [usuario, setUsuario] = useState<UsuarioSesion | null>(null)
+    const [usuario, setUsuario] = useState<UsuarioSesion | null>(() => {
+        const guardada = leerSesionGuardada()
+        if (guardada) {
+            establecerToken(guardada.token)
+        }
+        return guardada?.usuario ?? null
+    })
+
     const iniciarSesion = useCallback((nuevo: UsuarioSesion, token: string) => {
         establecerToken(token)
+        localStorage.setItem(CLAVE_SESION, JSON.stringify({ usuario: nuevo, token }))
         setUsuario(nuevo)
     },[])
 
     const cerrarSesion = useCallback(() =>{
         establecerToken(null)
+        localStorage.removeItem(CLAVE_SESION)
         setUsuario(null)
     },[])
 
