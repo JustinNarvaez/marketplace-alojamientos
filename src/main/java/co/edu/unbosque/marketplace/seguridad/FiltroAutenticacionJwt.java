@@ -30,6 +30,9 @@ public class FiltroAutenticacionJwt extends OncePerRequestFilter {
         this.servicioJwt = servicioJwt;
     }
 
+    // Claims.get(String, Class) solo acepta un Class crudo; List.class no
+    // puede expresar el tipo del elemento, de ahi el warning inevitable.
+    @SuppressWarnings("unchecked")
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                      HttpServletResponse response,

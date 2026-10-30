@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.AuthenticationException;
@@ -43,7 +44,13 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable())
+                // CSRF protege sesiones basadas en cookies, que el navegador adjunta solo;
+                // aqui no hay cookie de sesion, el cliente adjunta el JWT a mano en el
+                // header Authorization (cliente.ts), que un sitio atacante no puede leer
+                // ni reproducir. Es el caso que la propia guia de Spring Security marca
+                // como seguro para deshabilitar CSRF (API sin estado, sin navegador con
+                // sesion). Revisado SCRUM-22.
+                .csrf(AbstractHttpConfigurer::disable) // NOSONAR java:S4502
                 .sessionManagement(sesion -> sesion.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(autorizar -> autorizar
                         .requestMatchers("/api/auth/**").permitAll()
