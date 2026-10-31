@@ -38,6 +38,14 @@ class ManejadorGlobalExcepcionesTest {
     }
 
     @Test
+    void correoYaRegistradoResponde409() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new CorreoYaRegistradoException());
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals("Este correo ya está registrado.", respuesta.getBody().mensaje());
+    }
+
+    @Test
     void validacionResponde400ConElPrimerErrorDeCampo() {
         FieldError error = new FieldError("iniciarSesionRequest", "correo", "El correo no es válido.");
         BindingResult bindingResult = mock(BindingResult.class);

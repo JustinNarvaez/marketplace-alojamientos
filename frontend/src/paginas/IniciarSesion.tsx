@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Alert, Button, Paper, Stack, TextField, Typography } from '@mui/material'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Alert, Button, Link as MuiLink, Paper, Stack, TextField, Typography } from '@mui/material'
+import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom'
 import { usarSesion } from '../sesion/SesionContext'
 import type { Rol } from '../sesion/SesionContext'
 import { pedir, ErrorApi } from '../api/cliente'
@@ -73,6 +73,9 @@ export default function IniciarSesion() {
                 <Button type="submit" variant="contained" disabled={enviando} fullWidth>
                     {enviando ? 'Entrando…' : 'Entrar'}
                 </Button>
+                <Typography variant="body2" color="text.secondary">
+                    ¿No tienes cuenta? <MuiLink component={RouterLink} to="/registrarse">Regístrate</MuiLink>
+                </Typography>
             </Stack>
         </Paper>
     )

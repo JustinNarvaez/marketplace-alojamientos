@@ -3,6 +3,7 @@ import LayoutBase from './layout/LayoutBase'
 import RutaProtegida from './rutas/RutaProtegida'
 import Inicio from './paginas/Inicio'
 import IniciarSesion from './paginas/IniciarSesion'
+import Registrarse from './paginas/Registrarse'
 import NoAutorizado from './paginas/NoAutorizado'
 import NoEncontrado from './paginas/NoEncontrado'
 import PaginaPendiente from './paginas/PaginaPendiente'
@@ -13,6 +14,7 @@ export default function App() {
             <Route element={<LayoutBase />}>
                 <Route index element={<Inicio />} />
                 <Route path="iniciar-sesion" element={<IniciarSesion />} />
+                <Route path="registrarse" element={<Registrarse />} />
                 <Route path="no-autorizado" element={<NoAutorizado />} />
 
                 <Route element={<RutaProtegida roles={['HUESPED']} />}>
