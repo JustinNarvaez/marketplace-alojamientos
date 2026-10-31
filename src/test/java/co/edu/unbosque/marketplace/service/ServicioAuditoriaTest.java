@@ -44,4 +44,19 @@ class ServicioAuditoriaTest {
         assertEquals(ResultadoAuditoria.EXITO, log.getResultado());
         assertEquals("127.0.0.1", log.getIpOrigen());
     }
+
+    @Test
+    void registrarEnTransaccionActualGuardaElLogConLosDatosRecibidos() {
+        ServicioAuditoria servicioAuditoria = new ServicioAuditoria(logAuditoriaRepository);
+        Usuario usuario = new Usuario("Ana", "Gomez", "ana@ejemplo.com", "hash",
+                "3000000000", OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        usuario.setIdUsuario(1);
+
+        servicioAuditoria.registrarEnTransaccionActual(usuario, TipoEventoAuditoria.AUTENTICACION, "usuario", 1,
+                "REGISTRO", ResultadoAuditoria.EXITO, "127.0.0.1");
+
+        ArgumentCaptor<LogAuditoria> captor = ArgumentCaptor.forClass(LogAuditoria.class);
+        verify(logAuditoriaRepository).save(captor.capture());
+        assertEquals("REGISTRO", captor.getValue().getAccion());
+    }
 }
