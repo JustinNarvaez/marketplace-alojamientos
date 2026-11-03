@@ -16,6 +16,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.io.IOException;
 
@@ -23,6 +25,7 @@ import java.io.IOException;
  * Sesión sin estado (JWT, SCRUM-22/23): sin CSRF, sin sesión de servidor.
  * /api/auth/** es público; el resto de /api/** exige el token; todo lo que
  * no empieza por /api es el frontend, que ya sirve SpaConfig/ResolvedorSpa.
+ * Las reglas por rol van antes de /api/**: Spring aplica la primera que coincide.
  */
 @Configuration
 @EnableWebSecurity
@@ -54,10 +57,14 @@ public class SecurityConfig {
                 .sessionManagement(sesion -> sesion.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(autorizar -> autorizar
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/servicios").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )
-                .exceptionHandling(manejo -> manejo.authenticationEntryPoint(this::noAutenticado))
+                .exceptionHandling(manejo -> manejo
+                        .authenticationEntryPoint(this::noAutenticado)
+                        .accessDeniedHandler(this::sinPermiso)
+                )
                 .addFilterBefore(filtroAutenticacionJwt, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
@@ -72,5 +79,15 @@ public class SecurityConfig {
         response.setContentType("application/json;charset=UTF-8");
         response.getWriter().write(objectMapper.writeValueAsString(
                 new ErrorResponse("Tu sesión expiró. Inicia sesión de nuevo.")));
+    }
+
+    void sinPermiso(HttpServletRequest request,
+                    HttpServletResponse response,
+                    AccessDeniedException ex) throws IOException{
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType("application/json;charsetUFT=8");
+        response.getWriter().write(objectMapper.writeValueAsString(
+                new ErrorResponse("No tienes permiso para esta acción")
+        ));
     }
 }
