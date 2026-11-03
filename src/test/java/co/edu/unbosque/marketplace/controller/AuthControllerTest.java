@@ -2,12 +2,16 @@ package co.edu.unbosque.marketplace.controller;
 
 import co.edu.unbosque.marketplace.dto.IniciarSesionRequest;
 import co.edu.unbosque.marketplace.dto.IniciarSesionResponse;
+import co.edu.unbosque.marketplace.dto.RegistrarUsuarioRequest;
+import co.edu.unbosque.marketplace.dto.UsuarioRegistradoResponse;
 import co.edu.unbosque.marketplace.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import java.util.List;
 
@@ -34,5 +38,21 @@ class AuthControllerTest {
         IniciarSesionResponse respuesta = controller.iniciarSesion(request, httpRequest);
 
         assertEquals(esperado, respuesta);
+    }
+
+    @Test
+    void registrarDelegaEnAuthServiceYResponde201() {
+        AuthController controller = new AuthController(authService);
+        RegistrarUsuarioRequest request =
+                new RegistrarUsuarioRequest("Ana", "Gomez", "ana@ejemplo.com", "Secreta123", "HUESPED");
+        UsuarioRegistradoResponse esperado =
+                new UsuarioRegistradoResponse(1, "Ana", "ana@ejemplo.com", "HUESPED");
+        when(httpRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(authService.registrar(request, "127.0.0.1")).thenReturn(esperado);
+
+        ResponseEntity<UsuarioRegistradoResponse> respuesta = controller.registrar(request, httpRequest);
+
+        assertEquals(HttpStatus.CREATED, respuesta.getStatusCode());
+        assertEquals(esperado, respuesta.getBody());
     }
 }

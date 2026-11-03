@@ -1,8 +1,13 @@
 package co.edu.unbosque.marketplace.service;
 
 import co.edu.unbosque.marketplace.dto.IniciarSesionResponse;
+import co.edu.unbosque.marketplace.dto.RegistrarUsuarioRequest;
+import co.edu.unbosque.marketplace.dto.UsuarioRegistradoResponse;
+import co.edu.unbosque.marketplace.exception.CorreoYaRegistradoException;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
 import co.edu.unbosque.marketplace.exception.CuentaNoDisponibleException;
+import co.edu.unbosque.marketplace.model.Anfitrion;
+import co.edu.unbosque.marketplace.model.Huesped;
 import co.edu.unbosque.marketplace.model.Usuario;
 import co.edu.unbosque.marketplace.model.enums.EstadoCuenta;
 import co.edu.unbosque.marketplace.model.enums.ResultadoAuditoria;
@@ -15,6 +20,7 @@ import co.edu.unbosque.marketplace.seguridad.ServicioJwt;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -141,5 +147,66 @@ class AuthServiceTest {
 
         verify(servicioAuditoria).registrar(any(), eq(TipoEventoAuditoria.AUTENTICACION), any(), any(),
                 eq("INICIO_SESION"), any(), eq("127.0.0.1"));
+    }
+
+    private RegistrarUsuarioRequest unaSolicitudDeRegistro(String rol) {
+        return new RegistrarUsuarioRequest("Ana", "Gomez", "ana@ejemplo.com", "Secreta123", rol);
+    }
+
+    @Test
+    void registroEscenario1_huespedCreaLaCuentaActivaYLaFilaEnHuesped() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("Secreta123")).thenReturn("hash-codificado");
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(invocacion -> {
+            Usuario u = invocacion.getArgument(0);
+            u.setIdUsuario(10);
+            return u;
+        });
+
+        UsuarioRegistradoResponse respuesta = authService.registrar(unaSolicitudDeRegistro("HUESPED"), "127.0.0.1");
+
+        assertEquals(new UsuarioRegistradoResponse(10, "Ana", "ana@ejemplo.com", "HUESPED"), respuesta);
+
+        ArgumentCaptor<Usuario> usuarioGuardado = ArgumentCaptor.forClass(Usuario.class);
+        verify(usuarioRepository).save(usuarioGuardado.capture());
+        assertEquals("hash-codificado", usuarioGuardado.getValue().getContrasenaHash());
+        assertEquals(EstadoCuenta.ACTIVA, usuarioGuardado.getValue().getEstadoCuenta());
+
+        verify(huespedRepository).save(any(Huesped.class));
+        verify(anfitrionRepository, never()).save(any());
+        verify(servicioAuditoria).registrarEnTransaccionActual(eq(usuarioGuardado.getValue()),
+                eq(TipoEventoAuditoria.AUTENTICACION), eq("usuario"), eq(10), eq("REGISTRO"),
+                eq(ResultadoAuditoria.EXITO), eq("127.0.0.1"));
+    }
+
+    @Test
+    void registroEscenario1_anfitrionCreaLaFilaEnAnfitrionYNoEnHuesped() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("Secreta123")).thenReturn("hash-codificado");
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(invocacion -> {
+            Usuario u = invocacion.getArgument(0);
+            u.setIdUsuario(11);
+            return u;
+        });
+
+        UsuarioRegistradoResponse respuesta = authService.registrar(unaSolicitudDeRegistro("ANFITRION"), "127.0.0.1");
+
+        assertEquals("ANFITRION", respuesta.rol());
+        verify(anfitrionRepository).save(any(Anfitrion.class));
+        verify(huespedRepository, never()).save(any());
+    }
+
+    @Test
+    void registroEscenario2_correoYaRegistradoRechazaYNoCreaNada() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(unUsuarioActivo()));
+
+        assertThrows(CorreoYaRegistradoException.class,
+                () -> authService.registrar(unaSolicitudDeRegistro("HUESPED"), "127.0.0.1"));
+
+        verify(usuarioRepository, never()).save(any());
+        verify(huespedRepository, never()).save(any());
+        verify(anfitrionRepository, never()).save(any());
+        verify(servicioAuditoria, never())
+                .registrarEnTransaccionActual(any(), any(), any(), any(), any(), any(), any());
     }
 }
