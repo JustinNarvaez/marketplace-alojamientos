@@ -12,7 +12,7 @@ class CuentaNoDisponibleExceptionTest {
         CuentaNoDisponibleException ex = new CuentaNoDisponibleException(EstadoCuenta.INACTIVA);
 
         assertEquals(EstadoCuenta.INACTIVA, ex.getMotivo());
-        assertEquals("Tu cuenta está inactiva. Contacta al soporte para reactivarla.", ex.getMessage());
+        assertEquals("Tu cuenta está inactiva. Puedes reactivarla con tu correo y contraseña.", ex.getMessage());
     }
 
     @Test

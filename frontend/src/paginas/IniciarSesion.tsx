@@ -1,10 +1,12 @@
-import { useState } from 'react'
+
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Alert, Button, Link as MuiLink, Paper, Stack, TextField, Typography } from '@mui/material'
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom'
 import { usarSesion } from '../sesion/SesionContext'
 import type { Rol } from '../sesion/SesionContext'
 import { pedir, ErrorApi } from '../api/cliente'
+
 
 // Coincide campo a campo con IniciarSesionResponse del backend (los DTO son el contrato)
 interface RespuestaLogin {
@@ -15,23 +17,41 @@ interface RespuestaLogin {
     roles: Rol[]
 }
 
+interface EstadoNavegacion {
+    desde?: string
+    aviso?: string
+    cerrarSesion?: boolean
+}
+
 export default function IniciarSesion() {
-    const { iniciarSesion } = usarSesion()
+    const { iniciarSesion, cerrarSesion } = usarSesion()
     const navegar = useNavigate()
     const ubicacion = useLocation()
-    const destino = (ubicacion.state as { desde?: string } | null)?.desde ?? '/'
+    const estadoNavegacion = ubicacion.state as EstadoNavegacion | null
+    const destino = estadoNavegacion?.desde ?? '/'
+    // SCRUM-26: MiCuenta llega aqui tras desactivar la cuenta. La sesion se
+    // cierra ya montada esta pagina (fuera de RutaProtegida) para no perder el aviso.
+    const debeCerrarSesion = estadoNavegacion?.cerrarSesion === true
+    useEffect(() => {
+        if (debeCerrarSesion) {
+            cerrarSesion()
+        }
+    }, [debeCerrarSesion, cerrarSesion])
 
     const [correo, setCorreo] = useState('')
     const [contrasena, setContrasena] = useState('')
     const [error, setError] = useState<string | null>(null)
+    // 403 en el login = cuenta inactiva o restringida: se ofrece reactivarla (SCRUM-26).
+    // Si esta restringida, el backend tambien rechaza la reactivacion (escenario 4).
+    const [puedeReactivar, setPuedeReactivar] = useState(false)
     const [enviando, setEnviando] = useState(false)
 
-    const enviar = async (evento: FormEvent) => {
-        evento.preventDefault()
+    const entrar = async (ruta: '/auth/login' | '/auth/reactivar') => {
         setError(null)
+        setPuedeReactivar(false)
         setEnviando(true)
         try {
-            const respuesta = await pedir<RespuestaLogin>('/auth/login', {
+            const respuesta = await pedir<RespuestaLogin>(ruta, {
                 method: 'POST',
                 body: JSON.stringify({ correo, contrasena }),
             })
@@ -42,15 +62,35 @@ export default function IniciarSesion() {
             navegar(destino, { replace: true })
         } catch (err) {
             setError(err instanceof ErrorApi ? err.message : 'Ocurrió un error. Intenta más tarde')
+            setPuedeReactivar(ruta === '/auth/login' && err instanceof ErrorApi && err.estado === 403)
         } finally {
             setEnviando(false)
         }
     }
 
+    const enviar = (evento: FormEvent) => {
+        evento.preventDefault()
+        void entrar('/auth/login')
+    }
+
     return (
         <Paper sx={{ p: 4, maxWidth: 480, mx: 'auto' }}>
             <Typography variant="h5" gutterBottom>Iniciar sesión</Typography>
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+            {estadoNavegacion?.aviso && <Alert severity="info" sx={{ mb: 2 }}>{estadoNavegacion.aviso}</Alert>}
+            {error && (
+                <Alert
+                    severity="error"
+                    sx={{ mb: 2 }}
+                    action={puedeReactivar ? (
+                        <Button color="inherit" size="small" disabled={enviando}
+                                onClick={() => void entrar('/auth/reactivar')}>
+                            Reactivar
+                        </Button>
+                    ) : undefined}
+                >
+                    {error}
+                </Alert>
+            )}
             <Stack component="form" spacing={2} onSubmit={enviar}>
                 <TextField
                     label="Correo"

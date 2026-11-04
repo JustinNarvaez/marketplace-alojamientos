@@ -279,4 +279,49 @@ class AuthServiceTest {
                 () -> authService.restablecerContrasena("token-malo", "NuevaClave1", "127.0.0.1"));
         verify(usuarioRepository, never()).save(any());
     }
+
+    @Test
+    void reactivarEscenario2_cuentaInactivaConCredencialesCorrectasSeActivaEIniciaSesion() {
+        Usuario usuario = unUsuarioActivo();
+        usuario.setEstadoCuenta(EstadoCuenta.INACTIVA);
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("Secreta123", "hash-guardado")).thenReturn(true);
+        when(huespedRepository.existsById(7)).thenReturn(true);
+        when(servicioJwt.generar(7, "ana@ejemplo.com", List.of("HUESPED"))).thenReturn("token-sesion");
+
+        IniciarSesionResponse respuesta = authService.reactivar("ana@ejemplo.com", "Secreta123", "127.0.0.1");
+
+        assertEquals(EstadoCuenta.ACTIVA, usuario.getEstadoCuenta());
+        assertEquals("token-sesion", respuesta.token());
+        verify(usuarioRepository).save(usuario);
+        verify(servicioAuditoria).registrarEnTransaccionActual(usuario, TipoEventoAuditoria.AUTENTICACION,
+                "usuario", 7, "REACTIVACION_CUENTA", ResultadoAuditoria.EXITO, "127.0.0.1");
+    }
+
+    @Test
+    void reactivar_contrasenaIncorrectaNoReactiva() {
+        Usuario usuario = unUsuarioActivo();
+        usuario.setEstadoCuenta(EstadoCuenta.INACTIVA);
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("mala", "hash-guardado")).thenReturn(false);
+
+        assertThrows(CredencialesInvalidasException.class,
+                () -> authService.reactivar("ana@ejemplo.com", "mala", "127.0.0.1"));
+
+        assertEquals(EstadoCuenta.INACTIVA, usuario.getEstadoCuenta());
+        verify(usuarioRepository, never()).save(any());
+    }
+
+    @Test
+    void reactivarEscenario4_cuentaRestringidaNoSeReactiva() {
+        Usuario usuario = unUsuarioActivo();
+        usuario.setEstadoCuenta(EstadoCuenta.RESTRINGIDA);
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("Secreta123", "hash-guardado")).thenReturn(true);
+
+        assertThrows(CuentaNoDisponibleException.class,
+                () -> authService.reactivar("ana@ejemplo.com", "Secreta123", "127.0.0.1"));
+
+        verify(usuarioRepository, never()).save(any());
+    }
 }

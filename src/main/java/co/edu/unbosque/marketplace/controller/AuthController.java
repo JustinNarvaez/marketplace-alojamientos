@@ -52,4 +52,11 @@ public class AuthController {
                                                  HttpServletRequest httpRequest) {
         return authService.restablecerContrasena(request.token(), request.contrasena(), httpRequest.getRemoteAddr());
     }
+
+    // SCRUM-26: mismo cuerpo que el login (correo y contrasena).
+    @PostMapping("/reactivar")
+    public IniciarSesionResponse reactivar(@Valid @RequestBody IniciarSesionRequest request,
+                                           HttpServletRequest httpRequest) {
+        return authService.reactivar(request.correo(), request.contrasena(), httpRequest.getRemoteAddr());
+    }
 }

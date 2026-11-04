@@ -2,7 +2,7 @@ package co.edu.unbosque.marketplace.model;
 
 import co.edu.unbosque.marketplace.model.enums.EstadoCuenta;
 import jakarta.persistence.*;
-
+import co.edu.unbosque.marketplace.exception.CuentaNoDisponibleException;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -40,7 +40,23 @@ public class Usuario {
         this.fechaRegistro = fechaRegistro;
         this.estadoCuenta = estadoCuenta;
     }
+    // SCRUM-26: el propio usuario solo alterna entre ACTIVA e INACTIVA.
+    // RESTRINGIDA la pone un ADMINISTRADOR (SCRUM-49) y solo el la levanta.
+    public void desactivar() {
+        exigirNoRestringida();
+        this.estadoCuenta = EstadoCuenta.INACTIVA;
+    }
 
+    public void reactivar() {
+        exigirNoRestringida();
+        this.estadoCuenta = EstadoCuenta.ACTIVA;
+    }
+
+    private void exigirNoRestringida() {
+        if (estadoCuenta == EstadoCuenta.RESTRINGIDA) {
+            throw new CuentaNoDisponibleException(EstadoCuenta.RESTRINGIDA);
+        }
+    }
     public Integer getIdUsuario() {
         return idUsuario;
     }

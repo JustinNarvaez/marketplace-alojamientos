@@ -79,4 +79,13 @@ class ManejadorGlobalExcepcionesTest {
         assertEquals(HttpStatus.BAD_REQUEST, respuesta.getStatusCode());
         assertEquals("El enlace no es válido o ya venció. Solicita uno nuevo.", respuesta.getBody().mensaje());
     }
+
+    @Test
+    void reservasPendientesResponde409() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new ReservasPendientesException());
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals("No puedes desactivar tu cuenta: tienes reservas confirmadas que aún no terminan.",
+                respuesta.getBody().mensaje());
+    }
 }
