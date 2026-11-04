@@ -1,10 +1,12 @@
-import { useState } from 'react'
+
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Alert, Button, Link as MuiLink, Paper, Stack, TextField, Typography } from '@mui/material'
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom'
 import { usarSesion } from '../sesion/SesionContext'
 import type { Rol } from '../sesion/SesionContext'
 import { pedir, ErrorApi } from '../api/cliente'
+
 
 // Coincide campo a campo con IniciarSesionResponse del backend (los DTO son el contrato)
 interface RespuestaLogin {
@@ -18,14 +20,23 @@ interface RespuestaLogin {
 interface EstadoNavegacion {
     desde?: string
     aviso?: string
+    cerrarSesion?: boolean
 }
 
 export default function IniciarSesion() {
-    const { iniciarSesion } = usarSesion()
+    const { iniciarSesion, cerrarSesion } = usarSesion()
     const navegar = useNavigate()
     const ubicacion = useLocation()
     const estadoNavegacion = ubicacion.state as EstadoNavegacion | null
     const destino = estadoNavegacion?.desde ?? '/'
+    // SCRUM-26: MiCuenta llega aqui tras desactivar la cuenta. La sesion se
+    // cierra ya montada esta pagina (fuera de RutaProtegida) para no perder el aviso.
+    const debeCerrarSesion = estadoNavegacion?.cerrarSesion === true
+    useEffect(() => {
+        if (debeCerrarSesion) {
+            cerrarSesion()
+        }
+    }, [debeCerrarSesion, cerrarSesion])
 
     const [correo, setCorreo] = useState('')
     const [contrasena, setContrasena] = useState('')

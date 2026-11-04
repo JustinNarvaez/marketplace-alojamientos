@@ -23,7 +23,7 @@ interface RespuestaEstado {
 
 // SCRUM-26, escenarios 1 y 3: desactivar la cuenta con confirmacion.
 export default function MiCuenta() {
-    const { usuario, cerrarSesion } = usarSesion()
+    const { usuario } = usarSesion()
     const navegar = useNavigate()
     const [confirmando, setConfirmando] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -37,10 +37,14 @@ export default function MiCuenta() {
                 method: 'PATCH',
                 body: JSON.stringify({ estado: 'INACTIVA' }),
             })
-            cerrarSesion()
+            // No se cierra la sesion aqui: RutaProtegida la veria cerrada y
+            // redirigiria primero, sin el aviso. La cierra IniciarSesion al montar.
             navegar('/iniciar-sesion', {
                 replace: true,
-                state: { aviso: 'Tu cuenta quedó inactiva. Puedes reactivarla cuando quieras desde aquí.' },
+                state: {
+                    aviso: 'Tu cuenta quedó inactiva. Puedes reactivarla cuando quieras desde aquí.',
+                    cerrarSesion: true,
+                },
             })
         } catch (err) {
             // 409: anfitrion con reservas confirmadas pendientes (escenario 3)
