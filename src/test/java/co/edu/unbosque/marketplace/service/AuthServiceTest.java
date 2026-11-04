@@ -24,7 +24,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import co.edu.unbosque.marketplace.dto.MensajeResponse;
+import co.edu.unbosque.marketplace.exception.EnlaceRestablecimientoInvalidoException;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.MalformedJwtException;
 
+import static org.mockito.ArgumentMatchers.anyString;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -62,6 +67,8 @@ class AuthServiceTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private ServicioJwt servicioJwt;
+    @Mock
+    private Claims claims;
 
     private AuthService authService;
 
@@ -208,5 +215,68 @@ class AuthServiceTest {
         verify(anfitrionRepository, never()).save(any());
         verify(servicioAuditoria, never())
                 .registrarEnTransaccionActual(any(), any(), any(), any(), any(), any(), any());
+    }
+    @Test
+    void restablecerEscenario1_correoRegistradoGeneraEnlaceYAudita() {
+        Usuario usuario = unUsuarioActivo();
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        when(servicioJwt.generarRestablecimiento(eq(7), anyString())).thenReturn("token-r");
+
+        MensajeResponse respuesta = authService.solicitarRestablecimiento("ana@ejemplo.com", "127.0.0.1");
+
+        assertEquals("Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.",
+                respuesta.mensaje());
+        verify(servicioAuditoria).registrar(usuario, TipoEventoAuditoria.AUTENTICACION, "usuario", 7,
+                "SOLICITUD_RESTABLECIMIENTO", ResultadoAuditoria.EXITO, "127.0.0.1");
+    }
+
+    @Test
+    void restablecerEscenario1_correoInexistenteRespondeIgualYNoGeneraEnlace() {
+        when(usuarioRepository.findByEmail("nadie@ejemplo.com")).thenReturn(Optional.empty());
+
+        MensajeResponse respuesta = authService.solicitarRestablecimiento("nadie@ejemplo.com", "127.0.0.1");
+
+        assertEquals("Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.",
+                respuesta.mensaje());
+        verify(servicioJwt, never()).generarRestablecimiento(anyInt(), anyString());
+    }
+
+    @Test
+    void restablecerEscenario2_enlaceValidoCambiaLaContrasenaYAudita() {
+        Usuario usuario = unUsuarioActivo();
+        when(servicioJwt.validarRestablecimiento("token-r")).thenReturn(claims);
+        when(claims.get("huella", String.class)).thenReturn(AuthService.huellaDe(usuario));
+        when(claims.get("idUsuario", Integer.class)).thenReturn(7);
+        when(usuarioRepository.findById(7)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.encode("NuevaClave1")).thenReturn("hash-nuevo");
+
+        authService.restablecerContrasena("token-r", "NuevaClave1", "127.0.0.1");
+
+        assertEquals("hash-nuevo", usuario.getContrasenaHash());
+        verify(usuarioRepository).save(usuario);
+        verify(servicioAuditoria).registrarEnTransaccionActual(usuario, TipoEventoAuditoria.AUTENTICACION,
+                "usuario", 7, "RESTABLECIMIENTO_CONTRASENA", ResultadoAuditoria.EXITO, "127.0.0.1");
+    }
+
+    @Test
+    void restablecerEscenario3_enlaceYaUsadoSeRechaza() {
+        Usuario usuario = unUsuarioActivo();
+        when(servicioJwt.validarRestablecimiento("token-usado")).thenReturn(claims);
+        when(claims.get("huella", String.class)).thenReturn("huella-de-la-contrasena-anterior");
+        when(claims.get("idUsuario", Integer.class)).thenReturn(7);
+        when(usuarioRepository.findById(7)).thenReturn(Optional.of(usuario));
+
+        assertThrows(EnlaceRestablecimientoInvalidoException.class,
+                () -> authService.restablecerContrasena("token-usado", "NuevaClave1", "127.0.0.1"));
+        verify(passwordEncoder, never()).encode(anyString());
+    }
+
+    @Test
+    void restablecerEscenario3_enlaceVencidoOAdulteradoSeRechaza() {
+        when(servicioJwt.validarRestablecimiento("token-malo")).thenThrow(new MalformedJwtException("malo"));
+
+        assertThrows(EnlaceRestablecimientoInvalidoException.class,
+                () -> authService.restablecerContrasena("token-malo", "NuevaClave1", "127.0.0.1"));
+        verify(usuarioRepository, never()).save(any());
     }
 }

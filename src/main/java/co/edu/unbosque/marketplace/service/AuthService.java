@@ -20,13 +20,29 @@ import co.edu.unbosque.marketplace.seguridad.ServicioJwt;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import co.edu.unbosque.marketplace.dto.MensajeResponse;
+import co.edu.unbosque.marketplace.exception.EnlaceRestablecimientoInvalidoException;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Service
 public class AuthService {
+
+    private static final String ACCION_SOLICITUD_RESTABLECIMIENTO = "SOLICITUD_RESTABLECIMIENTO";
+    private static final String ACCION_RESTABLECIMIENTO = "RESTABLECIMIENTO_CONTRASENA";
+    private static final String MENSAJE_SOLICITUD =
+            "Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.";
+    private static final Logger LOGGER = LoggerFactory.getLogger(AuthService.class);
 
     private static final String ACCION_INICIO_SESION = "INICIO_SESION";
     private static final String ACCION_REGISTRO = "REGISTRO";
@@ -110,7 +126,64 @@ public class AuthService {
         return new UsuarioRegistradoResponse(
                 usuario.getIdUsuario(), usuario.getNombre(), usuario.getEmail(), request.rol());
     }
+    /**
+     * SCRUM-24, escenario 1. Responde siempre lo mismo, exista o no el
+     * correo, para no revelar que cuentas estan registradas.
+     */
+    public MensajeResponse solicitarRestablecimiento(String correo, String ipOrigen) {
+        Usuario usuario = usuarioRepository.findByEmail(correo)
+                .filter(encontrado -> encontrado.getEstadoCuenta() == EstadoCuenta.ACTIVA)
+                .orElse(null);
 
+        if (usuario != null) {
+            String token = servicioJwt.generarRestablecimiento(usuario.getIdUsuario(), huellaDe(usuario));
+            // Envio de correo simulado: el enlace queda en el log del servidor.
+            LOGGER.info("Correo simulado al usuario {}: /restablecer-contrasena?token={}",
+                    usuario.getIdUsuario(), token);
+            servicioAuditoria.registrar(usuario, TipoEventoAuditoria.AUTENTICACION, ENTIDAD_USUARIO,
+                    usuario.getIdUsuario(), ACCION_SOLICITUD_RESTABLECIMIENTO, ResultadoAuditoria.EXITO, ipOrigen);
+        }
+        return new MensajeResponse(MENSAJE_SOLICITUD);
+    }
+
+    /**
+     * SCRUM-24, escenarios 2 y 3. Al cambiar el hash cambia la huella, asi
+     * que el mismo enlace ya no vuelve a servir (un solo uso).
+     */
+    @Transactional
+    public MensajeResponse restablecerContrasena(String token, String nuevaContrasena, String ipOrigen) {
+        Usuario usuario = usuarioDelEnlace(token);
+        usuario.setContrasenaHash(passwordEncoder.encode(nuevaContrasena));
+        usuarioRepository.save(usuario);
+
+        servicioAuditoria.registrarEnTransaccionActual(usuario, TipoEventoAuditoria.AUTENTICACION,
+                ENTIDAD_USUARIO, usuario.getIdUsuario(), ACCION_RESTABLECIMIENTO, ResultadoAuditoria.EXITO, ipOrigen);
+        return new MensajeResponse("Tu contraseña se actualizó. Ya puedes iniciar sesión.");
+    }
+
+    private Usuario usuarioDelEnlace(String token) {
+        try {
+            Claims claims = servicioJwt.validarRestablecimiento(token);
+            String huella = claims.get("huella", String.class);
+            return usuarioRepository.findById(claims.get("idUsuario", Integer.class))
+                    .filter(usuario -> huellaDe(usuario).equals(huella))
+                    .orElseThrow(EnlaceRestablecimientoInvalidoException::new);
+        } catch (JwtException | IllegalArgumentException ex) {
+            throw new EnlaceRestablecimientoInvalidoException();
+        }
+    }
+
+    // SHA-256 del hash bcrypt: el JWT se puede leer sin la clave, asi que
+    // nunca lleva el hash tal cual. Sin private para que la prueba la use.
+    static String huellaDe(Usuario usuario) {
+        try {
+            byte[] resumen = MessageDigest.getInstance("SHA-256")
+                    .digest(usuario.getContrasenaHash().getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(resumen);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 no está disponible en esta JVM.", ex);
+        }
+    }
     private List<String> rolesDe(Integer idUsuario) {
         List<String> roles = new ArrayList<>();
         if (huespedRepository.existsById(idUsuario)) {

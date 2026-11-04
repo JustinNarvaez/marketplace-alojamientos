@@ -70,4 +70,13 @@ class ManejadorGlobalExcepcionesTest {
 
         assertEquals("Revisa los datos ingresados.", respuesta.getBody().mensaje());
     }
+
+    @Test
+    void enlaceInvalidoResponde400ConMensajeClaro() {
+        ResponseEntity<ErrorResponse> respuesta =
+                manejador.manejar(new EnlaceRestablecimientoInvalidoException());
+
+        assertEquals(HttpStatus.BAD_REQUEST, respuesta.getStatusCode());
+        assertEquals("El enlace no es válido o ya venció. Solicita uno nuevo.", respuesta.getBody().mensaje());
+    }
 }

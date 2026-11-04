@@ -20,6 +20,11 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(EnlaceRestablecimientoInvalidoException.class)
+    public ResponseEntity<ErrorResponse> manejar(EnlaceRestablecimientoInvalidoException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(CorreoYaRegistradoException.class)
     public ResponseEntity<ErrorResponse> manejar(CorreoYaRegistradoException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
