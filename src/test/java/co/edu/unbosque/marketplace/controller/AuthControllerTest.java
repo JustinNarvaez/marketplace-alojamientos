@@ -5,6 +5,9 @@ import co.edu.unbosque.marketplace.dto.IniciarSesionResponse;
 import co.edu.unbosque.marketplace.dto.RegistrarUsuarioRequest;
 import co.edu.unbosque.marketplace.dto.UsuarioRegistradoResponse;
 import co.edu.unbosque.marketplace.service.AuthService;
+import co.edu.unbosque.marketplace.dto.MensajeResponse;
+import co.edu.unbosque.marketplace.dto.RestablecerContrasenaRequest;
+import co.edu.unbosque.marketplace.dto.SolicitarRestablecimientoRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,5 +57,30 @@ class AuthControllerTest {
 
         assertEquals(HttpStatus.CREATED, respuesta.getStatusCode());
         assertEquals(esperado, respuesta.getBody());
+    }
+    @Test
+    void forgotPasswordDelegaEnAuthServiceConLaIp() {
+        AuthController controller = new AuthController(authService);
+        MensajeResponse esperado = new MensajeResponse("mensaje generico");
+        when(httpRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(authService.solicitarRestablecimiento("ana@ejemplo.com", "127.0.0.1")).thenReturn(esperado);
+
+        MensajeResponse respuesta = controller.solicitarRestablecimiento(
+                new SolicitarRestablecimientoRequest("ana@ejemplo.com"), httpRequest);
+
+        assertEquals(esperado, respuesta);
+    }
+
+    @Test
+    void resetPasswordDelegaEnAuthServiceConLaIp() {
+        AuthController controller = new AuthController(authService);
+        MensajeResponse esperado = new MensajeResponse("contrasena actualizada");
+        when(httpRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(authService.restablecerContrasena("token-r", "NuevaClave1", "127.0.0.1")).thenReturn(esperado);
+
+        MensajeResponse respuesta = controller.restablecerContrasena(
+                new RestablecerContrasenaRequest("token-r", "NuevaClave1"), httpRequest);
+
+        assertEquals(esperado, respuesta);
     }
 }

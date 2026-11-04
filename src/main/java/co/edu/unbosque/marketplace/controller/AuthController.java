@@ -1,5 +1,8 @@
 package co.edu.unbosque.marketplace.controller;
 
+import co.edu.unbosque.marketplace.dto.MensajeResponse;
+import co.edu.unbosque.marketplace.dto.RestablecerContrasenaRequest;
+import co.edu.unbosque.marketplace.dto.SolicitarRestablecimientoRequest;
 import co.edu.unbosque.marketplace.dto.IniciarSesionRequest;
 import co.edu.unbosque.marketplace.dto.IniciarSesionResponse;
 import co.edu.unbosque.marketplace.dto.RegistrarUsuarioRequest;
@@ -35,5 +38,18 @@ public class AuthController {
                                                                  HttpServletRequest httpRequest) {
         UsuarioRegistradoResponse creado = authService.registrar(request, httpRequest.getRemoteAddr());
         return ResponseEntity.status(HttpStatus.CREATED).body(creado);
+    }
+
+    // SCRUM-24: /api/auth/** ya es publico en SecurityConfig, no hace falta sesion.
+    @PostMapping("/forgot-password")
+    public MensajeResponse solicitarRestablecimiento(@Valid @RequestBody SolicitarRestablecimientoRequest request,
+                                                     HttpServletRequest httpRequest) {
+        return authService.solicitarRestablecimiento(request.correo(), httpRequest.getRemoteAddr());
+    }
+
+    @PostMapping("/reset-password")
+    public MensajeResponse restablecerContrasena(@Valid @RequestBody RestablecerContrasenaRequest request,
+                                                 HttpServletRequest httpRequest) {
+        return authService.restablecerContrasena(request.token(), request.contrasena(), httpRequest.getRemoteAddr());
     }
 }
