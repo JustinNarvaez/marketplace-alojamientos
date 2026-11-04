@@ -25,6 +25,11 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(ReservasPendientesException.class)
+    public ResponseEntity<ErrorResponse> manejar(ReservasPendientesException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(CorreoYaRegistradoException.class)
     public ResponseEntity<ErrorResponse> manejar(CorreoYaRegistradoException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
