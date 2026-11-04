@@ -17,7 +17,7 @@ public class CuentaNoDisponibleException extends RuntimeException {
 
     private static String mensajePara(EstadoCuenta motivo) {
         return switch (motivo) {
-            case INACTIVA -> "Tu cuenta está inactiva. Contacta al soporte para reactivarla.";
+            case INACTIVA -> "Tu cuenta está inactiva. Puedes reactivarla con tu correo y contraseña.";
             case RESTRINGIDA -> "Tu cuenta está restringida. Contacta al soporte para más información.";
             case ACTIVA -> "Tu cuenta no está disponible en este momento.";
         };
