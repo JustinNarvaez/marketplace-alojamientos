@@ -2,6 +2,7 @@ package co.edu.unbosque.marketplace.seguridad;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.MalformedJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -41,6 +42,11 @@ public class FiltroAutenticacionJwt extends OncePerRequestFilter {
         if (encabezado != null && encabezado.startsWith("Bearer ")) {
             try {
                 Claims claims = servicioJwt.validarYExtraer(encabezado.substring(7));
+
+                // Un token de restablecimiento (SCRUM-24) nunca sirve como sesion.
+                if (claims.get(ServicioJwt.CLAIM_PROPOSITO) != null) {
+                    throw new MalformedJwtException("No es un token de sesion.");
+                }
                 List<GrantedAuthority> autoridades = claims.get("roles", List.class).stream()
                         .map(rol -> new SimpleGrantedAuthority("ROLE_" + rol))
                         .map(GrantedAuthority.class::cast)

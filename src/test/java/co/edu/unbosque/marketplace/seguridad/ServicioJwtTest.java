@@ -18,8 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class ServicioJwtTest {
 
     private final ServicioJwt servicioJwt = new ServicioJwt(
-            "clave-de-prueba-bien-larga-para-cumplir-hs256-256-bits", 60);
-
+            "clave-de-prueba-bien-larga-para-cumplir-hs256-256-bits", 60, 15);
     @Test
     void generaUnTokenQueSeValidaYDevuelveLosMismosDatos() {
         String token = servicioJwt.generar(7, "ana@ejemplo.com", List.of("HUESPED", "ANFITRION"));
@@ -42,10 +41,25 @@ class ServicioJwtTest {
     @Test
     void rechazaUnTokenExpirado() {
         ServicioJwt servicioDeExpiracionInmediata = new ServicioJwt(
-                "clave-de-prueba-bien-larga-para-cumplir-hs256-256-bits", 0);
-
+                "clave-de-prueba-bien-larga-para-cumplir-hs256-256-bits", 0, 0);
         String token = servicioDeExpiracionInmediata.generar(1, "ana@ejemplo.com", List.of("HUESPED"));
 
         assertThrows(ExpiredJwtException.class, () -> servicioDeExpiracionInmediata.validarYExtraer(token));
+    }
+    @Test
+    void generaUnTokenDeRestablecimientoConSuProposito() {
+        String token = servicioJwt.generarRestablecimiento(7, "huella-de-prueba");
+
+        Claims claims = servicioJwt.validarRestablecimiento(token);
+
+        assertEquals(7, claims.get("idUsuario", Integer.class));
+        assertEquals("huella-de-prueba", claims.get("huella", String.class));
+    }
+
+    @Test
+    void unTokenDeSesionNoSirveParaRestablecer() {
+        String tokenDeSesion = servicioJwt.generar(7, "ana@ejemplo.com", List.of("HUESPED"));
+
+        assertThrows(JwtException.class, () -> servicioJwt.validarRestablecimiento(tokenDeSesion));
     }
 }
