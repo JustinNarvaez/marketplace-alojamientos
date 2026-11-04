@@ -73,6 +73,9 @@ export default function IniciarSesion() {
                 <Button type="submit" variant="contained" disabled={enviando} fullWidth>
                     {enviando ? 'Entrando…' : 'Entrar'}
                 </Button>
+                <Typography variant="body2">
+                    <MuiLink component={RouterLink} to="/olvide-contrasena">¿Olvidaste tu contraseña?</MuiLink>
+                </Typography>
                 <Typography variant="body2" color="text.secondary">
                     ¿No tienes cuenta? <MuiLink component={RouterLink} to="/registrarse">Regístrate</MuiLink>
                 </Typography>

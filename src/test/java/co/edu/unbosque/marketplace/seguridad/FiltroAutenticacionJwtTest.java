@@ -63,7 +63,9 @@ class FiltroAutenticacionJwtTest {
         when(request.getHeader("Authorization")).thenReturn("Bearer token-valido");
         when(servicioJwt.validarYExtraer("token-valido")).thenReturn(claims);
         when(claims.getSubject()).thenReturn("ana@ejemplo.com");
+        when(claims.get(ServicioJwt.CLAIM_PROPOSITO)).thenReturn(null);
         when(claims.get("roles", List.class)).thenReturn(List.of("HUESPED"));
+
 
         filtro.doFilterInternal(request, response, filterChain);
 
@@ -78,6 +80,18 @@ class FiltroAutenticacionJwtTest {
     void conTokenInvalidoNoAutenticaYSigueLaCadena() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer token-malo");
         when(servicioJwt.validarYExtraer("token-malo")).thenThrow(new MalformedJwtException("malo"));
+
+        filtro.doFilterInternal(request, response, filterChain);
+
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void unTokenDeRestablecimientoNoAutenticaComoSesion() throws Exception {
+        when(request.getHeader("Authorization")).thenReturn("Bearer token-de-restablecimiento");
+        when(servicioJwt.validarYExtraer("token-de-restablecimiento")).thenReturn(claims);
+        when(claims.get(ServicioJwt.CLAIM_PROPOSITO)).thenReturn(ServicioJwt.PROPOSITO_RESTABLECER);
 
         filtro.doFilterInternal(request, response, filterChain);
 
