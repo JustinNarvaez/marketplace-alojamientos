@@ -83,4 +83,18 @@ class AuthControllerTest {
 
         assertEquals(esperado, respuesta);
     }
+
+    @Test
+    void reactivarDelegaEnAuthServiceConLaIp() {
+        AuthController controller = new AuthController(authService);
+        IniciarSesionResponse esperado =
+                new IniciarSesionResponse("token", 1, "Ana", "ana@ejemplo.com", List.of("HUESPED"));
+        when(httpRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(authService.reactivar("ana@ejemplo.com", "Secreta123", "127.0.0.1")).thenReturn(esperado);
+
+        IniciarSesionResponse respuesta = controller.reactivar(
+                new IniciarSesionRequest("ana@ejemplo.com", "Secreta123"), httpRequest);
+
+        assertEquals(esperado, respuesta);
+    }
 }

@@ -40,6 +40,7 @@ public class AuthService {
 
     private static final String ACCION_SOLICITUD_RESTABLECIMIENTO = "SOLICITUD_RESTABLECIMIENTO";
     private static final String ACCION_RESTABLECIMIENTO = "RESTABLECIMIENTO_CONTRASENA";
+    private static final String ACCION_REACTIVACION = "REACTIVACION_CUENTA";
     private static final String MENSAJE_SOLICITUD =
             "Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.";
     private static final Logger LOGGER = LoggerFactory.getLogger(AuthService.class);
@@ -90,6 +91,28 @@ public class AuthService {
 
         return new IniciarSesionResponse(
                 token, usuario.getIdUsuario(), usuario.getNombre(), usuario.getEmail(), roles);
+    }
+
+    /**
+     * SCRUM-26, escenario 2. Una cuenta INACTIVA no puede iniciar sesion
+     * (SCRUM-22, escenario 3), asi que se reactiva probando de nuevo las
+     * credenciales. Una RESTRINGIDA no se reactiva (Usuario.reactivar lanza 403).
+     */
+    @Transactional
+    public IniciarSesionResponse reactivar(String correo, String contrasena, String ipOrigen) {
+        Usuario usuario = usuarioRepository.findByEmail(correo).orElse(null);
+
+        if (usuario == null || !passwordEncoder.matches(contrasena, usuario.getContrasenaHash())) {
+            registrarIntento(usuario, ResultadoAuditoria.FALLO, ipOrigen);
+            throw new CredencialesInvalidasException();
+        }
+
+        usuario.reactivar();
+        usuarioRepository.save(usuario);
+        servicioAuditoria.registrarEnTransaccionActual(usuario, TipoEventoAuditoria.AUTENTICACION,
+                ENTIDAD_USUARIO, usuario.getIdUsuario(), ACCION_REACTIVACION, ResultadoAuditoria.EXITO, ipOrigen);
+
+        return iniciarSesion(correo, contrasena, ipOrigen);
     }
 
     @Transactional
