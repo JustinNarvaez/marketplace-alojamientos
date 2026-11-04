@@ -32,6 +32,9 @@ export default function LayoutBase() {
                     {tieneRol('ADMINISTRADOR') && (
                         <Button color="inherit" component={RouterLink} to="/administracion">Administración</Button>
                     )}
+                    {autenticado && (
+                        <Button color="inherit" component={RouterLink} to="/mi-cuenta">Mi cuenta</Button>
+                    )}
                     {autenticado ? (
                         <Button color="inherit" onClick={salir}>Salir ({usuario?.nombre})</Button>
                     ) : (

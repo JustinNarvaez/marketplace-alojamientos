@@ -9,6 +9,7 @@ import RestablecerContrasena from './paginas/RestablecerContrasena'
 import NoAutorizado from './paginas/NoAutorizado'
 import NoEncontrado from './paginas/NoEncontrado'
 import PaginaPendiente from './paginas/PaginaPendiente'
+import MiCuenta from './paginas/MiCuenta'
 
 export default function App() {
     return (
@@ -20,6 +21,10 @@ export default function App() {
                 <Route path="olvide-contrasena" element={<OlvideContrasena />} />
                 <Route path="restablecer-contrasena" element={<RestablecerContrasena />} />
                 <Route path="no-autorizado" element={<NoAutorizado />} />
+
+                <Route element={<RutaProtegida />}>
+                    <Route path="mi-cuenta" element={<MiCuenta />} />
+                </Route>
 
                 <Route element={<RutaProtegida roles={['HUESPED']} />}>
                     <Route path="mis-reservas" element={<PaginaPendiente titulo="Mis reservas" />} />
