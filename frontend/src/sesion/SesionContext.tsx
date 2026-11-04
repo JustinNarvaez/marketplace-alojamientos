@@ -27,12 +27,34 @@ interface SesionGuardada {
     token: string
 }
 
+// El JWT trae su vencimiento en el claim exp (segundos desde 1970).
+// Aqui NO se verifica la firma, eso lo hace el backend; solo se evita
+// mostrar como iniciada una sesion que el backend ya va a rechazar (SCRUM-23).
+function tokenVigente(token: string): boolean {
+    try {
+        const carga = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+        const {exp} = JSON.parse(atob(carga)) as {exp?: number}
+        return typeof exp === 'number' && exp * 1000 > Date.now()
+    } catch {
+        return false
+    }
+}
+
 // Se lee una sola vez, al montar ProveedorSesion, para que recargar la
 // pagina (F5) no cierre la sesion (el token vive en memoria en cliente.ts).
+// Si el token ya vencio, se borra y el usuario debe iniciar sesion de nuevo.
 function leerSesionGuardada(): SesionGuardada | null {
     try {
         const bruto = localStorage.getItem(CLAVE_SESION)
-        return bruto ? JSON.parse(bruto) as SesionGuardada : null
+        if (!bruto) {
+            return null
+        }
+        const guardada = JSON.parse(bruto) as SesionGuardada
+        if (!tokenVigente(guardada.token)) {
+            localStorage.removeItem(CLAVE_SESION)
+            return null
+        }
+        return guardada
     } catch {
         return null
     }
