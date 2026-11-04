@@ -78,7 +78,7 @@ public class SecurityConfig {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json;charset=UTF-8");
         response.getWriter().write(objectMapper.writeValueAsString(
-                new ErrorResponse("Tu sesión expiró. Inicia sesion de nuevo.")));
+                new ErrorResponse("Tu sesión expiró. Inicia sesión de nuevo.")));
     }
 
     void sinPermiso(HttpServletRequest request,
