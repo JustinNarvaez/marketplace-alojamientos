@@ -449,7 +449,9 @@ components:
         nombre:
           type: string
         categoria:
-          type: string
+          type:
+          - string
+          - "null"
     CrearPublicacionRequest:
       type: object
       properties:
@@ -541,7 +543,9 @@ components:
         direccion:
           type: string
         ubicacion:
-          type: string
+          type:
+          - string
+          - "null"
         precioNoche:
           type: number
         tarifaLimpieza:
