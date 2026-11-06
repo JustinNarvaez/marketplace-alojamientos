@@ -55,6 +55,16 @@
 			<artifactId>flyway-database-postgresql</artifactId>
 		</dependency>
 
+		<!-- Contrato OpenAPI de los servicios REST (SCRUM-59). Expone
+			 /v3/api-docs(.yaml) y /swagger-ui.html generados desde los
+			 controllers existentes; version 3.x es la que corresponde a
+			 Spring Boot 4.x. -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>3.2.0</version>
+		</dependency>
+
 		<!-- JWT: firma y valida el token de sesion (SCRUM-22). jjwt-impl y
 			 jjwt-jackson van en runtime porque el codigo solo usa la API
 			 de jjwt-api; la implementacion se resuelve por SPI. -->
@@ -105,6 +115,16 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- Valida respuestas de MockMvc contra el contrato OpenAPI (SCRUM-59,
+			 escenario 3). Reescritura 3.x de swagger-request-validator-mockmvc,
+			 con soporte de OpenAPI 3.1 y Spring 7+. -->
+		<dependency>
+			<groupId>com.atlassian.oai</groupId>
+			<artifactId>openapi-request-validator-mockmvc</artifactId>
+			<version>3.0.0</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
