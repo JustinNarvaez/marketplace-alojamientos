@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 import {
     Alert,
     Button,
+    CircularProgress,
     Dialog,
     DialogActions,
     DialogContent,
@@ -10,24 +12,119 @@ import {
     Divider,
     Paper,
     Stack,
+    TextField,
     Typography,
 } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import { usarSesion } from '../sesion/SesionContext'
+import type { Rol } from '../sesion/SesionContext'
 import { pedir, ErrorApi } from '../api/cliente'
 
-// Coincide con EstadoCuentaResponse del backend
+const PATRON_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+// Coincide con PerfilUsuarioResponse del backend
+interface RespuestaPerfil {
+    id: number
+    nombre: string
+    apellido: string
+    correo: string
+    telefono: string | null
+    roles: Rol[]
+}
+
+// Coincide con PerfilActualizadoResponse del backend: el correo es el "sub"
+// del JWT, asi que al cambiarlo el backend reemite el token (SCRUM-25).
+interface RespuestaPerfilActualizado extends RespuestaPerfil {
+    token: string
+}
+
 interface RespuestaEstado {
     estadoCuenta: string
 }
 
-// SCRUM-26, escenarios 1 y 3: desactivar la cuenta con confirmacion.
+// SCRUM-25 (ver/editar datos basicos) + SCRUM-26 (desactivar cuenta).
 export default function MiCuenta() {
-    const { usuario } = usarSesion()
+    const { iniciarSesion } = usarSesion()
     const navegar = useNavigate()
+
+    const [cargando, setCargando] = useState(true)
+    const [nombre, setNombre] = useState('')
+    const [apellido, setApellido] = useState('')
+    const [correo, setCorreo] = useState('')
+    const [telefono, setTelefono] = useState('')
+    const [roles, setRoles] = useState<Rol[]>([])
+
+    const [errorPerfil, setErrorPerfil] = useState<string | null>(null)
+    const [exitoPerfil, setExitoPerfil] = useState(false)
+    const [guardando, setGuardando] = useState(false)
+    const [intentoGuardar, setIntentoGuardar] = useState(false)
+
     const [confirmando, setConfirmando] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [enviando, setEnviando] = useState(false)
+
+    useEffect(() => {
+        let activo = true
+        pedir<RespuestaPerfil>('/users/me')
+            .then((datos) => {
+                if (!activo) {
+                    return
+                }
+                setNombre(datos.nombre)
+                setApellido(datos.apellido)
+                setCorreo(datos.correo)
+                setTelefono(datos.telefono ?? '')
+                setRoles(datos.roles)
+            })
+            .catch((err) => {
+                if (activo) {
+                    setErrorPerfil(err instanceof ErrorApi ? err.message : 'No pudimos cargar tu perfil.')
+                }
+            })
+            .finally(() => {
+                if (activo) {
+                    setCargando(false)
+                }
+            })
+        return () => {
+            activo = false
+        }
+    }, [])
+
+    const correoInvalido = intentoGuardar && !PATRON_CORREO.test(correo)
+    const nombreInvalido = intentoGuardar && nombre.trim() === ''
+    const apellidoInvalido = intentoGuardar && apellido.trim() === ''
+
+    const guardarPerfil = async (evento: FormEvent) => {
+        evento.preventDefault()
+        setIntentoGuardar(true)
+        setErrorPerfil(null)
+        setExitoPerfil(false)
+
+        if (!PATRON_CORREO.test(correo) || nombre.trim() === '' || apellido.trim() === '') {
+            return
+        }
+
+        setGuardando(true)
+        try {
+            const respuesta = await pedir<RespuestaPerfilActualizado>('/users/me', {
+                method: 'PUT',
+                body: JSON.stringify({ nombre, apellido, correo, telefono }),
+            })
+            setRoles(respuesta.roles)
+            setExitoPerfil(true)
+            // El correo pudo haber cambiado: se guarda el token nuevo para
+            // que la sesion siga siendo valida (ver RespuestaPerfilActualizado).
+            iniciarSesion(
+                { id: respuesta.id, nombre: respuesta.nombre, correo: respuesta.correo, roles: respuesta.roles },
+                respuesta.token,
+            )
+        } catch (err) {
+            setErrorPerfil(err instanceof ErrorApi ? err.message : 'Ocurrió un error. Intenta más tarde')
+        } finally {
+            setGuardando(false)
+        }
+    }
 
     const desactivar = async () => {
         setError(null)
@@ -55,13 +152,64 @@ export default function MiCuenta() {
         }
     }
 
+    if (cargando) {
+        return (
+            <Paper sx={{ p: 4, maxWidth: 560, mx: 'auto', textAlign: 'center' }}>
+                <CircularProgress />
+            </Paper>
+        )
+    }
+
     return (
         <Paper sx={{ p: 4, maxWidth: 560, mx: 'auto' }}>
             <Typography variant="h5" gutterBottom>Mi cuenta</Typography>
-            <Stack spacing={0.5} sx={{ mb: 3 }}>
-                <Typography><strong>Nombre:</strong> {usuario?.nombre}</Typography>
-                <Typography><strong>Correo:</strong> {usuario?.correo}</Typography>
-                <Typography><strong>Roles:</strong> {usuario?.roles.join(', ')}</Typography>
+
+            {errorPerfil && <Alert severity="error" sx={{ mb: 2 }}>{errorPerfil}</Alert>}
+            {exitoPerfil && <Alert severity="success" sx={{ mb: 2 }}>Tus datos se actualizaron.</Alert>}
+
+            <Stack component="form" spacing={2} onSubmit={guardarPerfil} sx={{ mb: 3 }}>
+                <TextField
+                    label="Nombre"
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
+                    error={nombreInvalido}
+                    helperText={nombreInvalido ? 'El nombre es obligatorio.' : ' '}
+                    required
+                    fullWidth
+                />
+                <TextField
+                    label="Apellido"
+                    value={apellido}
+                    onChange={(e) => setApellido(e.target.value)}
+                    error={apellidoInvalido}
+                    helperText={apellidoInvalido ? 'El apellido es obligatorio.' : ' '}
+                    required
+                    fullWidth
+                />
+                <TextField
+                    label="Correo"
+                    type="email"
+                    value={correo}
+                    onChange={(e) => setCorreo(e.target.value)}
+                    autoComplete="email"
+                    error={correoInvalido}
+                    helperText={correoInvalido ? 'El correo no es válido.' : ' '}
+                    required
+                    fullWidth
+                />
+                <TextField
+                    label="Teléfono"
+                    value={telefono}
+                    onChange={(e) => setTelefono(e.target.value)}
+                    autoComplete="tel"
+                    fullWidth
+                />
+                <Typography variant="body2" color="text.secondary">
+                    <strong>Roles:</strong> {roles.join(', ')}
+                </Typography>
+                <Button type="submit" variant="contained" disabled={guardando} fullWidth>
+                    {guardando ? 'Guardando…' : 'Guardar cambios'}
+                </Button>
             </Stack>
 
             <Divider sx={{ mb: 3 }} />
