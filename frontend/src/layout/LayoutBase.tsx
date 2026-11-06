@@ -27,7 +27,10 @@ export default function LayoutBase() {
                         <Button color="inherit" component={RouterLink} to="/mis-reservas">Mis reservas</Button>
                     )}
                     {tieneRol('ANFITRION') && (
-                        <Button color="inherit" component={RouterLink} to="/mis-publicaciones">Mis publicaciones</Button>
+                        <>
+                            <Button color="inherit" component={RouterLink} to="/mis-publicaciones">Mis publicaciones</Button>
+                            <Button color="inherit" component={RouterLink} to="/mis-publicaciones/nueva">Publicar</Button>
+                        </>
                     )}
                     {tieneRol('ADMINISTRADOR') && (
                         <Button color="inherit" component={RouterLink} to="/administracion">Administración</Button>
