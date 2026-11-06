@@ -10,6 +10,7 @@ import NoAutorizado from './paginas/NoAutorizado'
 import NoEncontrado from './paginas/NoEncontrado'
 import PaginaPendiente from './paginas/PaginaPendiente'
 import MiCuenta from './paginas/MiCuenta'
+import CrearPublicacion from './paginas/CrearPublicacion'
 
 export default function App() {
     return (
@@ -31,6 +32,7 @@ export default function App() {
                 </Route>
                 <Route element={<RutaProtegida roles={['ANFITRION']} />}>
                     <Route path="mis-publicaciones" element={<PaginaPendiente titulo="Mis publicaciones" />} />
+                    <Route path="mis-publicaciones/nueva" element={<CrearPublicacion />} />
                 </Route>
                 <Route element={<RutaProtegida roles={['ADMINISTRADOR']} />}>
                     <Route path="administracion" element={<PaginaPendiente titulo="Administración" />} />
