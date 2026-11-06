@@ -1,17 +1,26 @@
 package co.edu.unbosque.marketplace.exception;
 
+import co.edu.unbosque.marketplace.config.FiltroIdPeticion;
 import co.edu.unbosque.marketplace.dto.ErrorResponse;
 import co.edu.unbosque.marketplace.model.enums.EstadoCuenta;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpInputMessage;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -87,5 +96,59 @@ class ManejadorGlobalExcepcionesTest {
         assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
         assertEquals("No puedes desactivar tu cuenta: tienes reservas confirmadas que aún no terminan.",
                 respuesta.getBody().mensaje());
+    }
+
+    @AfterEach
+    void limpiarMdc() {
+        MDC.clear();
+    }
+
+    @Test
+    void errorNoControladoResponde500ConMensajeGenericoYElIdDePeticion() {
+        MDC.put(FiltroIdPeticion.CLAVE_MDC, "abc-123");
+
+        ResponseEntity<ErrorResponse> respuesta =
+                manejador.manejar(new IllegalStateException("detalle interno que no debe salir"));
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, respuesta.getStatusCode());
+        assertEquals("Ocurrió un error inesperado. Si continúa, comparte este código con soporte: abc-123",
+                respuesta.getBody().mensaje());
+        assertFalse(respuesta.getBody().mensaje().contains("detalle interno"));
+    }
+
+    @Test
+    void errorNoControladoSinIdDePeticionUsaMensajeGenerico() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new RuntimeException("x"));
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, respuesta.getStatusCode());
+        assertEquals("Ocurrió un error inesperado. Intenta de nuevo más tarde.", respuesta.getBody().mensaje());
+    }
+
+    @Test
+    void metodoNoPermitidoConservaSu405() {
+        ResponseEntity<ErrorResponse> respuesta =
+                manejador.manejar(new HttpRequestMethodNotSupportedException("DELETE"));
+
+        assertEquals(HttpStatus.METHOD_NOT_ALLOWED, respuesta.getStatusCode());
+        assertEquals("Esta operación no está permitida.", respuesta.getBody().mensaje());
+    }
+
+    @Test
+    void tipoDeContenidoNoSoportadoConservaSu415() {
+        ResponseEntity<ErrorResponse> respuesta =
+                manejador.manejar(new HttpMediaTypeNotSupportedException(
+                        MediaType.TEXT_PLAIN, List.of(MediaType.APPLICATION_JSON)));
+
+        assertEquals(HttpStatus.UNSUPPORTED_MEDIA_TYPE, respuesta.getStatusCode());
+        assertEquals("El formato de los datos no es compatible.", respuesta.getBody().mensaje());
+    }
+
+    @Test
+    void jsonMalFormadoResponde400() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(
+                new HttpMessageNotReadableException("JSON roto", mock(HttpInputMessage.class)));
+
+        assertEquals(HttpStatus.BAD_REQUEST, respuesta.getStatusCode());
+        assertEquals("Revisa los datos ingresados.", respuesta.getBody().mensaje());
     }
 }
