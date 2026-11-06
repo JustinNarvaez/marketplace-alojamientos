@@ -13,6 +13,8 @@ tags:
     \ (SCRUM-22)."
 - name: Servicios
   description: "Catálogo de servicios adicionales de un alojamiento (ej. WiFi, parqueadero)."
+- name: Publicaciones
+  description: Publicaciones de alojamientos del anfitrión (SCRUM-27).
 - name: Mi cuenta
   description: Perfil y estado de la cuenta del usuario autenticado (SCRUM-25/26).
 paths:
@@ -133,6 +135,48 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
           description: El usuario autenticado no es ADMINISTRADOR
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/listings:
+    post:
+      tags:
+      - Publicaciones
+      summary: Crear una publicación
+      description: Solo un ANFITRION. La publicación queda en BORRADOR con la política
+        FLEXIBLE.
+      operationId: crear_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CrearPublicacionRequest"
+        required: true
+      responses:
+        "201":
+          description: Publicación creada en BORRADOR
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PublicacionResponse"
+        "400":
+          description: "Datos inválidos (capacidad, precio, campos obligatorios) o\
+            \ servicio inexistente"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: El usuario autenticado no es ANFITRION
           content:
             '*/*':
               schema:
@@ -406,6 +450,123 @@ components:
           type: string
         categoria:
           type: string
+    CrearPublicacionRequest:
+      type: object
+      properties:
+        titulo:
+          type: string
+          maxLength: 150
+          minLength: 0
+        descripcion:
+          type: string
+          minLength: 1
+        tipoAlojamiento:
+          type: string
+          enum:
+          - CASA
+          - APARTAMENTO
+          - HABITACION
+          - CABANA
+          - FINCA
+        capacidad:
+          type: integer
+          format: int32
+          maximum: 50
+          minimum: 1
+        ciudad:
+          type: string
+          maxLength: 80
+          minLength: 0
+        direccion:
+          type: string
+          maxLength: 200
+          minLength: 0
+        ubicacion:
+          type: string
+          maxLength: 200
+          minLength: 0
+        precioNoche:
+          type: number
+          exclusiveMinimum: 0
+        tarifaLimpieza:
+          type: number
+          minimum: 0
+        reservaInmediata:
+          type: boolean
+        idsServicios:
+          type: array
+          items:
+            type: integer
+            format: int32
+        reglas:
+          type: array
+          items:
+            type: string
+            maxLength: 255
+            minLength: 0
+        imagenes:
+          type: array
+          items:
+            type: string
+            maxLength: 500
+            minLength: 0
+      required:
+      - capacidad
+      - ciudad
+      - descripcion
+      - direccion
+      - precioNoche
+      - tipoAlojamiento
+      - titulo
+    PublicacionResponse:
+      type: object
+      properties:
+        idPublicacion:
+          type: integer
+          format: int32
+        idAlojamiento:
+          type: integer
+          format: int32
+        titulo:
+          type: string
+        descripcion:
+          type: string
+        tipoAlojamiento:
+          type: string
+        capacidad:
+          type: integer
+          format: int32
+        ciudad:
+          type: string
+        direccion:
+          type: string
+        ubicacion:
+          type: string
+        precioNoche:
+          type: number
+        tarifaLimpieza:
+          type: number
+        reservaInmediata:
+          type: boolean
+        estado:
+          type: string
+        politicaCancelacion:
+          type: string
+        servicios:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServicioResponse"
+        reglas:
+          type: array
+          items:
+            type: string
+        imagenes:
+          type: array
+          items:
+            type: string
+        fechaCreacion:
+          type: string
+          format: date-time
     RestablecerContrasenaRequest:
       type: object
       properties:
