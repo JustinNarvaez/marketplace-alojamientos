@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
@@ -9,5 +10,5 @@ public record ActualizarPerfilRequest(
         @NotBlank(message = "El correo es obligatorio.")
         @Email(message = "El correo no es válido.")
         String correo,
-        String telefono
+        @Schema(nullable = true) String telefono
 ) {}

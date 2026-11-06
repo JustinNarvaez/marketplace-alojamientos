@@ -1,0 +1,542 @@
+openapi: 3.1.0
+info:
+  title: Marketplace de alojamientos API
+  description: "Contrato REST del backend: autenticacion, perfil de usuario y servicios\
+    \ de alojamiento."
+  version: v1
+servers:
+- url: http://localhost:8080
+  description: Generated server url
+tags:
+- name: Autenticación
+  description: "Registro, inicio de sesión y recuperación de cuenta. Todo público\
+    \ (SCRUM-22)."
+- name: Servicios
+  description: "Catálogo de servicios adicionales de un alojamiento (ej. WiFi, parqueadero)."
+- name: Mi cuenta
+  description: Perfil y estado de la cuenta del usuario autenticado (SCRUM-25/26).
+paths:
+  /api/users/me:
+    get:
+      tags:
+      - Mi cuenta
+      summary: Ver los datos básicos del perfil propio
+      operationId: obtenerPerfil
+      responses:
+        "200":
+          description: Perfil del usuario autenticado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PerfilUsuarioResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+    put:
+      tags:
+      - Mi cuenta
+      summary: "Actualizar nombre, apellido, correo o teléfono del perfil propio"
+      description: "Si el correo cambia, reemite el JWT (el correo es el \"sub\" del\
+        \ token)."
+      operationId: actualizarPerfil
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActualizarPerfilRequest"
+        required: true
+      responses:
+        "200":
+          description: "Perfil actualizado, incluye el token vigente"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PerfilActualizadoResponse"
+        "400":
+          description: "Nombre, apellido o correo inválidos"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: El correo ya es de otra cuenta
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/servicios:
+    get:
+      tags:
+      - Servicios
+      summary: Listar todos los servicios disponibles
+      operationId: listar
+      responses:
+        "200":
+          description: Lista de servicios
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServicioResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Servicios
+      summary: Crear un servicio
+      description: Solo un ADMINISTRADOR puede crear servicios.
+      operationId: crear
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CrearServicioRequest"
+        required: true
+      responses:
+        "201":
+          description: Servicio creado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ServicioResponse"
+        "400":
+          description: Nombre vacío
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: El usuario autenticado no es ADMINISTRADOR
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/auth/reset-password:
+    post:
+      tags:
+      - Autenticación
+      summary: Cambiar la contraseña con el token del enlace de restablecimiento
+      operationId: restablecerContrasena
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestablecerContrasenaRequest"
+        required: true
+      responses:
+        "200":
+          description: Contraseña actualizada
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MensajeResponse"
+        "400":
+          description: "Token vencido, inválido o ya usado, o contraseña débil"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/register:
+    post:
+      tags:
+      - Autenticación
+      summary: Crear una cuenta como HUESPED o ANFITRION
+      operationId: registrar
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegistrarUsuarioRequest"
+        required: true
+      responses:
+        "201":
+          description: Cuenta creada
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UsuarioRegistradoResponse"
+        "400":
+          description: "Datos inválidos: correo mal formado, contraseña débil o rol\
+            \ distinto de HUESPED/ANFITRION"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: El correo ya está registrado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/reactivar:
+    post:
+      tags:
+      - Autenticación
+      summary: Reactivar una cuenta inactiva con correo y contraseña
+      operationId: reactivar
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IniciarSesionRequest"
+        required: true
+      responses:
+        "200":
+          description: "Cuenta reactivada, emite el JWT de sesión"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/IniciarSesionResponse"
+        "400":
+          description: Correo o contraseña con formato inválido
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Correo o contraseña incorrectos
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "La cuenta está restringida, no se puede reactivar sola"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/login:
+    post:
+      tags:
+      - Autenticación
+      summary: Iniciar sesión con correo y contraseña
+      operationId: iniciarSesion
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IniciarSesionRequest"
+        required: true
+      responses:
+        "200":
+          description: "Credenciales correctas, emite el JWT de sesión"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/IniciarSesionResponse"
+        "400":
+          description: Correo o contraseña con formato inválido
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Correo o contraseña incorrectos
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Cuenta inactiva o restringida
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/forgot-password:
+    post:
+      tags:
+      - Autenticación
+      summary: Solicitar el enlace para restablecer la contraseña
+      description: "Responde igual exista o no el correo, para no revelar qué cuentas\
+        \ están registradas."
+      operationId: solicitarRestablecimiento
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SolicitarRestablecimientoRequest"
+        required: true
+      responses:
+        "200":
+          description: Mensaje genérico de confirmación
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MensajeResponse"
+        "400":
+          description: Correo con formato inválido
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/users/me/status:
+    patch:
+      tags:
+      - Mi cuenta
+      summary: Activar o desactivar la propia cuenta
+      operationId: cambiarEstado
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CambiarEstadoCuentaRequest"
+        required: true
+      responses:
+        "200":
+          description: Estado actualizado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/EstadoCuentaResponse"
+        "400":
+          description: Estado inválido (solo ACTIVA o INACTIVA)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Anfitrión con reservas confirmadas pendientes
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+components:
+  schemas:
+    ActualizarPerfilRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+        apellido:
+          type: string
+          minLength: 1
+        correo:
+          type: string
+          format: email
+          minLength: 1
+        telefono:
+          type:
+          - string
+          - "null"
+      required:
+      - apellido
+      - correo
+      - nombre
+    ErrorResponse:
+      type: object
+      properties:
+        mensaje:
+          type: string
+    PerfilActualizadoResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        nombre:
+          type: string
+        apellido:
+          type: string
+        correo:
+          type: string
+        telefono:
+          type:
+          - string
+          - "null"
+        roles:
+          type: array
+          items:
+            type: string
+        token:
+          type: string
+    CrearServicioRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+        categoria:
+          type: string
+      required:
+      - nombre
+    ServicioResponse:
+      type: object
+      properties:
+        idServicio:
+          type: integer
+          format: int32
+        nombre:
+          type: string
+        categoria:
+          type: string
+    RestablecerContrasenaRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+        contrasena:
+          type: string
+          minLength: 1
+          pattern: "^(?=.*[A-Za-z])(?=.*\\d).{8,}$"
+      required:
+      - contrasena
+      - token
+    MensajeResponse:
+      type: object
+      properties:
+        mensaje:
+          type: string
+    RegistrarUsuarioRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+        apellido:
+          type: string
+          minLength: 1
+        correo:
+          type: string
+          format: email
+          minLength: 1
+        contrasena:
+          type: string
+          minLength: 1
+          pattern: "^(?=.*[A-Za-z])(?=.*\\d).{8,}$"
+        rol:
+          type: string
+          minLength: 1
+          pattern: HUESPED|ANFITRION
+      required:
+      - apellido
+      - contrasena
+      - correo
+      - nombre
+      - rol
+    UsuarioRegistradoResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        nombre:
+          type: string
+        correo:
+          type: string
+        rol:
+          type: string
+    IniciarSesionRequest:
+      type: object
+      properties:
+        correo:
+          type: string
+          format: email
+          minLength: 1
+        contrasena:
+          type: string
+          minLength: 1
+      required:
+      - contrasena
+      - correo
+    IniciarSesionResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        id:
+          type: integer
+          format: int32
+        nombre:
+          type: string
+        correo:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+    SolicitarRestablecimientoRequest:
+      type: object
+      properties:
+        correo:
+          type: string
+          format: email
+          minLength: 1
+      required:
+      - correo
+    CambiarEstadoCuentaRequest:
+      type: object
+      properties:
+        estado:
+          type: string
+          minLength: 1
+          pattern: ACTIVA|INACTIVA
+      required:
+      - estado
+    EstadoCuentaResponse:
+      type: object
+      properties:
+        estadoCuenta:
+          type: string
+    PerfilUsuarioResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        nombre:
+          type: string
+        apellido:
+          type: string
+        correo:
+          type: string
+        telefono:
+          type:
+          - string
+          - "null"
+        roles:
+          type: array
+          items:
+            type: string
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
