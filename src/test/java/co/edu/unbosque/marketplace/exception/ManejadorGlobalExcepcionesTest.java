@@ -98,6 +98,14 @@ class ManejadorGlobalExcepcionesTest {
                 respuesta.getBody().mensaje());
     }
 
+    @Test
+    void servicioNoEncontradoResponde400() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new ServicioNoEncontradoException());
+
+        assertEquals(HttpStatus.BAD_REQUEST, respuesta.getStatusCode());
+        assertEquals("Alguno de los servicios seleccionados no existe.", respuesta.getBody().mensaje());
+    }
+
     @AfterEach
     void limpiarMdc() {
         MDC.clear();
