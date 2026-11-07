@@ -23,6 +23,8 @@ tags:
   description: Extras con precio que ofrece cada publicación (SCRUM-37).
 - name: Mi cuenta
   description: Perfil y estado de la cuenta del usuario autenticado (SCRUM-25/26).
+- name: Disponibilidad
+  description: Calendario de disponibilidad del anfitrión (SCRUM-31).
 - name: Cotizaciones
   description: Cotización de una estancia con desglose de tarifas (SCRUM-36).
 paths:
@@ -237,6 +239,123 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/listings/{idPublicacion}/availability/{idDisponibilidad}:
+    put:
+      tags:
+      - Disponibilidad
+      summary: Modificar un periodo del calendario
+      operationId: actualizar
+      parameters:
+      - name: idPublicacion
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - name: idDisponibilidad
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuardarDisponibilidadRequest"
+        required: true
+      responses:
+        "200":
+          description: Periodo modificado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DisponibilidadResponse"
+        "400":
+          description: "Fechas invertidas, campos faltantes o periodo RESERVADO"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: No es ANFITRION o la publicación es de otro anfitrión
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La publicación o el periodo no existen
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Se superpone con otro periodo o con una reserva activa
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+    delete:
+      tags:
+      - Disponibilidad
+      summary: Eliminar un periodo del calendario
+      operationId: eliminar
+      parameters:
+      - name: idPublicacion
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - name: idDisponibilidad
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "204":
+          description: Periodo eliminado
+        "400":
+          description: El periodo es RESERVADO
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: No es ANFITRION o la publicación es de otro anfitrión
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La publicación o el periodo no existen
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Hay una reserva activa en esas fechas
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/servicios:
     get:
       tags:
@@ -383,6 +502,66 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
           description: El usuario autenticado no es ANFITRION
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/listings/{idPublicacion}/availability:
+    post:
+      tags:
+      - Disponibilidad
+      summary: Agregar un periodo al calendario
+      description: El anfitrión agrega periodos DISPONIBLE o BLOQUEADO; RESERVADO
+        lo pone el sistema al reservar.
+      operationId: crear_2
+      parameters:
+      - name: idPublicacion
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuardarDisponibilidadRequest"
+        required: true
+      responses:
+        "201":
+          description: Periodo creado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DisponibilidadResponse"
+        "400":
+          description: "Fechas invertidas, campos faltantes o estado RESERVADO"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: No es ANFITRION o la publicación es de otro anfitrión
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La publicación no existe
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Se superpone con otro periodo o con una reserva activa
           content:
             '*/*':
               schema:
@@ -638,6 +817,48 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: No existe o no es una publicación del anfitrión autenticado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/listings/mine/{idPublicacion}/availability:
+    get:
+      tags:
+      - Disponibilidad
+      summary: Ver el calendario de una publicación propia
+      operationId: listar_2
+      parameters:
+      - name: idPublicacion
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: "Periodos del calendario, por fecha de inicio"
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DisponibilidadResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: No es ANFITRION o la publicación es de otro anfitrión
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La publicación no existe
           content:
             '*/*':
               schema:
@@ -990,6 +1211,39 @@ components:
           - "null"
         precio:
           type: number
+    GuardarDisponibilidadRequest:
+      type: object
+      properties:
+        fechaInicio:
+          type: string
+          format: date
+        fechaFin:
+          type: string
+          format: date
+        estado:
+          type: string
+          enum:
+          - DISPONIBLE
+          - RESERVADO
+          - BLOQUEADO
+      required:
+      - estado
+      - fechaFin
+      - fechaInicio
+    DisponibilidadResponse:
+      type: object
+      properties:
+        idDisponibilidad:
+          type: integer
+          format: int32
+        fechaInicio:
+          type: string
+          format: date
+        fechaFin:
+          type: string
+          format: date
+        estado:
+          type: string
     CrearServicioRequest:
       type: object
       properties:

@@ -17,6 +17,7 @@ import Auditoria from './paginas/Auditoria'
 import Reportes from './paginas/Reportes'
 import MisPublicaciones from './paginas/MisPublicaciones'
 import DetallePublicacion from './paginas/DetallePublicacion'
+import DisponibilidadPublicacion from './paginas/DisponibilidadPublicacion'
 
 export default function App() {
     return (
@@ -41,7 +42,10 @@ export default function App() {
                     <Route path="mis-publicaciones" element={<MisPublicaciones />} />
                     <Route path="mis-publicaciones/nueva" element={<CrearPublicacion />} />
                     <Route path="mis-publicaciones/:idPublicacion/extras" element={<ServiciosAdicionales />} />
+                    <Route path="mis-publicaciones/:idPublicacion/extras" element={<ServiciosAdicionales />} />
+                    <Route path="mis-publicaciones/:idPublicacion/disponibilidad" element={<DisponibilidadPublicacion />} />
                     <Route path="mis-publicaciones/:id/editar" element={<CrearPublicacion />} />
+                    <Route path="mis-publicaciones/:id" element={<DetallePublicacion />} />
                     <Route path="mis-publicaciones/:id" element={<DetallePublicacion />} />
                 </Route>
                 <Route element={<RutaProtegida roles={['ADMINISTRADOR']} />}>

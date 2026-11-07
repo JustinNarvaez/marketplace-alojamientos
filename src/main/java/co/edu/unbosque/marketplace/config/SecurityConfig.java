@@ -67,6 +67,9 @@ public class SecurityConfig {
                         // SCRUM-30: solo el panel de gestion del anfitrion. GET /api/listings/{id}
                         // (sin /mine) es el detalle publico que consume el huesped (SCRUM-35).
                         .requestMatchers(HttpMethod.GET, "/api/listings/mine/**").hasRole("ANFITRION")
+                        .requestMatchers(HttpMethod.POST, "/api/listings/*/availability").hasRole("ANFITRION")
+                        .requestMatchers(HttpMethod.PUT, "/api/listings/*/availability/*").hasRole("ANFITRION")
+                        .requestMatchers(HttpMethod.DELETE, "/api/listings/*/availability/*").hasRole("ANFITRION")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )

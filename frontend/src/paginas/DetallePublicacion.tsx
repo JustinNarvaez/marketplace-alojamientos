@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Alert, Box, Button, Chip, Divider, List, ListItem, ListItemText, Paper, Stack, Typography } from '@mui/material'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom'
 import { pedir, ErrorApi } from '../api/cliente'
 
 // Coinciden con PublicacionResponse del backend (SCRUM-27/30, los DTO son el contrato)
@@ -67,6 +67,17 @@ export default function DetallePublicacion() {
                 {publicacion.ciudad} · {publicacion.direccion}
                 {publicacion.ubicacion && ` · ${publicacion.ubicacion}`}
             </Typography>
+
+            <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }}>
+                <Button variant="outlined" size="small" component={RouterLink}
+                        to={`/mis-publicaciones/${publicacion.idPublicacion}/disponibilidad`}>
+                    Disponibilidad
+                </Button>
+                <Button variant="outlined" size="small" component={RouterLink}
+                        to={`/mis-publicaciones/${publicacion.idPublicacion}/extras`}>
+                    Servicios adicionales
+                </Button>
+            </Stack>
 
             {publicacion.imagenes.length > 0 && (
                 <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', mb: 2 }}>

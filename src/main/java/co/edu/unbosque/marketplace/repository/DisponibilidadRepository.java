@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.List;
 
 public interface DisponibilidadRepository extends JpaRepository<Disponibilidad, Integer> {
 
@@ -15,4 +16,13 @@ public interface DisponibilidadRepository extends JpaRepository<Disponibilidad, 
     boolean existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
             Integer idAlojamiento, Collection<EstadoDisponibilidad> estados,
             LocalDate salida, LocalDate llegada);
+
+    // SCRUM-31: el calendario del alojamiento, en orden de fechas.
+    List<Disponibilidad> findByAlojamiento_IdAlojamientoOrderByFechaInicio(Integer idAlojamiento);
+
+    // SCRUM-31, escenario 2 al modificar: igual que la de arriba pero sin
+    // contar el propio periodo (si no, siempre chocaria consigo mismo).
+    boolean existsByAlojamiento_IdAlojamientoAndIdDisponibilidadNotAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
+            Integer idAlojamiento, Integer idExcluido, Collection<EstadoDisponibilidad> estados,
+            LocalDate fin, LocalDate inicio);
 }
