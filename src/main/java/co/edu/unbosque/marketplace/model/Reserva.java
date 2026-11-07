@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.model;
 
+import co.edu.unbosque.marketplace.exception.ReservaNoConfirmableException;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
 import jakarta.persistence.*;
 
@@ -130,6 +131,24 @@ public class Reserva {
 
     public void setNumeroHuespedes(Short numeroHuespedes) {
         this.numeroHuespedes = numeroHuespedes;
+    }
+
+    /**
+     * SCRUM-33: solo una reserva pendiente se confirma (reserva inmediata,
+     * aprobacion del anfitrion o pago). El bloqueo de las fechas lo hace
+     * DisponibilidadService.confirmarReservaYBloquear, que llama a este metodo.
+     */
+    public void confirmar() {
+        validarQueSePuedeConfirmar();
+        estado = EstadoReserva.CONFIRMADA;
+    }
+
+    // Se valida antes de revisar las fechas: a una reserva que ya esta
+    // confirmada se le dice eso, no que sus propias fechas estan ocupadas.
+    public void validarQueSePuedeConfirmar() {
+        if (estado != EstadoReserva.PENDIENTE_APROBACION) {
+            throw new ReservaNoConfirmableException(estado);
+        }
     }
 
     public EstadoReserva getEstado() {

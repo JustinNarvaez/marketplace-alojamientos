@@ -69,6 +69,11 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(ReservaNoConfirmableException.class)
+    public ResponseEntity<ErrorResponse> manejar(ReservaNoConfirmableException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(PeriodoSuperpuestoException.class)
     public ResponseEntity<ErrorResponse> manejar(PeriodoSuperpuestoException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
