@@ -81,6 +81,15 @@ class ManejadorGlobalExcepcionesTest {
     }
 
     @Test
+    void reporteInvalidoResponde400ConElMotivo() {
+        ResponseEntity<ErrorResponse> respuesta =
+                manejador.manejar(new ReporteInvalidoException("El formato debe ser pdf o xlsx."));
+
+        assertEquals(HttpStatus.BAD_REQUEST, respuesta.getStatusCode());
+        assertEquals("El formato debe ser pdf o xlsx.", respuesta.getBody().mensaje());
+    }
+
+    @Test
     void enlaceInvalidoResponde400ConMensajeClaro() {
         ResponseEntity<ErrorResponse> respuesta =
                 manejador.manejar(new EnlaceRestablecimientoInvalidoException());

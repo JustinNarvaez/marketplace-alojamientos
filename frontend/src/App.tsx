@@ -14,6 +14,7 @@ import CrearPublicacion from './paginas/CrearPublicacion'
 import CotizarPublicacion from './paginas/CotizarPublicacion'
 import ServiciosAdicionales from './paginas/ServiciosAdicionales'
 import Auditoria from './paginas/Auditoria'
+import Reportes from './paginas/Reportes'
 import MisPublicaciones from './paginas/MisPublicaciones'
 import DetallePublicacion from './paginas/DetallePublicacion'
 
@@ -45,6 +46,7 @@ export default function App() {
                 <Route element={<RutaProtegida roles={['ADMINISTRADOR']} />}>
                     <Route path="administracion" element={<PaginaPendiente titulo="Administración" />} />
                     <Route path="administracion/auditoria" element={<Auditoria />} />
+                    <Route path="administracion/reportes" element={<Reportes />} />
                 </Route>
 
                 <Route path="*" element={<NoEncontrado />} />

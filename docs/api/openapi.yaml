@@ -8,6 +8,8 @@ servers:
 - url: http://localhost:8080
   description: Generated server url
 tags:
+- name: Reportes
+  description: "Reportes de gestión en PDF o Excel, solo para ADMINISTRADOR (SCRUM-53)."
 - name: Auditoría
   description: "Eventos de log_auditoria, solo para ADMINISTRADOR (SCRUM-51)."
 - name: Autenticación
@@ -576,6 +578,59 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: No existe o no es una publicación del anfitrión autenticado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/admin/reports/{tipo}:
+    get:
+      tags:
+      - Reportes
+      summary: Exportar un reporte de gestión
+      description: "Descarga el reporte con los datos vigentes. Sin datos, el archivo\
+        \ trae solo los encabezados."
+      operationId: exportar
+      parameters:
+      - name: tipo
+        in: path
+        description: "usuarios, publicaciones, reservas, ingresos o demanda"
+        required: true
+        schema:
+          type: string
+      - name: format
+        in: query
+        description: pdf o xlsx
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Archivo del reporte
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Tipo de reporte o formato inválido
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: El usuario autenticado no es ADMINISTRADOR
           content:
             '*/*':
               schema:
