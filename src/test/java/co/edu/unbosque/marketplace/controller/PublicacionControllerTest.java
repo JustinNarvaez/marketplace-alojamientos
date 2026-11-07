@@ -2,6 +2,7 @@ package co.edu.unbosque.marketplace.controller;
 
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
+import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
 import co.edu.unbosque.marketplace.model.enums.TipoAlojamiento;
 import co.edu.unbosque.marketplace.service.PublicacionService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -47,5 +48,32 @@ class PublicacionControllerTest {
 
         assertEquals(HttpStatus.CREATED, respuesta.getStatusCode());
         assertEquals(esperada, respuesta.getBody());
+    }
+
+    @Test
+    void listarMiasDelegaConElCorreoDeLaSesion() {
+        PublicacionController controller = new PublicacionController(publicacionService);
+        List<PublicacionResumenResponse> esperada = List.of(
+                new PublicacionResumenResponse(1, "Casa", "Bogota", new BigDecimal("200000"), "ACTIVA"));
+        when(principal.getName()).thenReturn("mario@ejemplo.com");
+        when(publicacionService.listarMias("mario@ejemplo.com")).thenReturn(esperada);
+
+        List<PublicacionResumenResponse> respuesta = controller.listarMias(principal);
+
+        assertEquals(esperada, respuesta);
+    }
+
+    @Test
+    void obtenerDetalleDelegaConElIdYElCorreoDeLaSesion() {
+        PublicacionController controller = new PublicacionController(publicacionService);
+        PublicacionResponse esperada = new PublicacionResponse(1, 3, "Casa", "Casa amplia", "CASA",
+                (short) 6, "Bogota", "Calle 1", null, new BigDecimal("200000"), BigDecimal.ZERO, true,
+                "ACTIVA", "FLEXIBLE", List.of(), List.of(), List.of(), OffsetDateTime.now());
+        when(principal.getName()).thenReturn("mario@ejemplo.com");
+        when(publicacionService.obtenerDetalle("mario@ejemplo.com", 1)).thenReturn(esperada);
+
+        PublicacionResponse respuesta = controller.obtenerDetalle(1, principal);
+
+        assertEquals(esperada, respuesta);
     }
 }

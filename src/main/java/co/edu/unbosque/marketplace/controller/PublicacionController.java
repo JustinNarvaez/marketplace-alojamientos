@@ -3,6 +3,7 @@ package co.edu.unbosque.marketplace.controller;
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.ErrorResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
+import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
 import co.edu.unbosque.marketplace.service.PublicacionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -15,12 +16,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.security.Principal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/listings")
@@ -53,5 +57,31 @@ public class PublicacionController {
         PublicacionResponse creada =
                 publicacionService.crear(principal.getName(), request, httpRequest.getRemoteAddr());
         return ResponseEntity.status(HttpStatus.CREATED).body(creada);
+    }
+
+    @Operation(summary = "Listar mis publicaciones")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Listado de publicaciones del anfitrión (vacío si no tiene ninguna)"),
+            @ApiResponse(responseCode = "401", description = "Falta el token o ya venció",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    })
+    @GetMapping("/mine")
+    public List<PublicacionResumenResponse> listarMias(Principal principal) {
+        return publicacionService.listarMias(principal.getName());
+    }
+
+    // El id sale de la URL y la pertenencia se valida en el service: a otro
+    // anfitrion le responde 404 igual que si la publicacion no existiera.
+    @Operation(summary = "Ver el detalle de una publicación propia")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Detalle completo: servicios, reglas, imágenes y política de cancelación"),
+            @ApiResponse(responseCode = "401", description = "Falta el token o ya venció",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "No existe o no es una publicación del anfitrión autenticado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    })
+    @GetMapping("/{id}")
+    public PublicacionResponse obtenerDetalle(@PathVariable Integer id, Principal principal) {
+        return publicacionService.obtenerDetalle(principal.getName(), id);
     }
 }
