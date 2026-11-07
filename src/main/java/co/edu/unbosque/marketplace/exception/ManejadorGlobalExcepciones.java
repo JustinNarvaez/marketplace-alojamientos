@@ -89,6 +89,16 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(PublicacionNoActivaException.class)
+    public ResponseEntity<ErrorResponse> manejar(PublicacionNoActivaException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(PublicacionIncompletaException.class)
+    public ResponseEntity<ErrorResponse> manejar(PublicacionIncompletaException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(ServicioAdicionalDuplicadoException.class)
     public ResponseEntity<ErrorResponse> manejar(ServicioAdicionalDuplicadoException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));

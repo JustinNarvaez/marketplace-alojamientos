@@ -1,9 +1,12 @@
 package co.edu.unbosque.marketplace.controller;
 
+import co.edu.unbosque.marketplace.dto.CambiarEstadoPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
+import co.edu.unbosque.marketplace.dto.EstadoPublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
+import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
 import co.edu.unbosque.marketplace.model.enums.TipoAlojamiento;
 import co.edu.unbosque.marketplace.service.PublicacionService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -92,6 +95,21 @@ class PublicacionControllerTest {
         when(publicacionService.editar("mario@ejemplo.com", 1, solicitud, "127.0.0.1")).thenReturn(esperada);
 
         PublicacionResponse respuesta = controller.editar(1, solicitud, principal, httpRequest);
+
+        assertEquals(esperada, respuesta);
+    }
+
+    @Test
+    void cambiarEstadoDelegaConElIdElCorreoYLaIp() {
+        PublicacionController controller = new PublicacionController(publicacionService);
+        CambiarEstadoPublicacionRequest solicitud = new CambiarEstadoPublicacionRequest("PAUSADA");
+        EstadoPublicacionResponse esperada = new EstadoPublicacionResponse("PAUSADA");
+        when(principal.getName()).thenReturn("mario@ejemplo.com");
+        when(httpRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(publicacionService.cambiarEstado("mario@ejemplo.com", 1, EstadoPublicacion.PAUSADA, "127.0.0.1"))
+                .thenReturn(esperada);
+
+        EstadoPublicacionResponse respuesta = controller.cambiarEstado(1, solicitud, principal, httpRequest);
 
         assertEquals(esperada, respuesta);
     }
