@@ -2,7 +2,9 @@ package co.edu.unbosque.marketplace.service;
 
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
+import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
+import co.edu.unbosque.marketplace.exception.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.ServicioNoEncontradoException;
 import co.edu.unbosque.marketplace.model.Alojamiento;
 import co.edu.unbosque.marketplace.model.Anfitrion;
@@ -13,6 +15,7 @@ import co.edu.unbosque.marketplace.model.ReglaAlojamiento;
 import co.edu.unbosque.marketplace.model.Servicio;
 import co.edu.unbosque.marketplace.model.Usuario;
 import co.edu.unbosque.marketplace.model.enums.EstadoCuenta;
+import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
 import co.edu.unbosque.marketplace.model.enums.ResultadoAuditoria;
 import co.edu.unbosque.marketplace.model.enums.TipoAlojamiento;
 import co.edu.unbosque.marketplace.model.enums.TipoEventoAuditoria;
@@ -103,6 +106,23 @@ class PublicacionServiceTest {
         Servicio servicio = new Servicio(nombre, "Basico");
         servicio.setIdServicio(id);
         return servicio;
+    }
+
+    // Publicacion completa (con su Alojamiento y Anfitrion) para los tests
+    // de listado/detalle, que no pasan por crear().
+    private Publicacion unaPublicacion(int idPublicacion, int idAnfitrion, String ciudad) {
+        Usuario usuarioAnfitrion = new Usuario("Mario", "Perez", "mario@ejemplo.com", "hash",
+                "3000000000", OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        usuarioAnfitrion.setIdUsuario(idAnfitrion);
+        Anfitrion anfitrion = new Anfitrion(usuarioAnfitrion);
+        Alojamiento alojamiento = new Alojamiento(anfitrion, TipoAlojamiento.APARTAMENTO, (short) 4,
+                ciudad, "Cra 1 # 2-3", "Bocagrande", OffsetDateTime.now());
+        alojamiento.setIdAlojamiento(idPublicacion + 100);
+        Publicacion publicacion = new Publicacion(alojamiento, flexible(), "Apartamento frente al mar",
+                "Vista al mar", new BigDecimal("320000.00"), BigDecimal.ZERO, Boolean.TRUE,
+                EstadoPublicacion.ACTIVA, OffsetDateTime.now(), null);
+        publicacion.setIdPublicacion(idPublicacion);
+        return publicacion;
     }
 
     // El usuario de la sesion es anfitrion y existe la politica FLEXIBLE.
@@ -223,5 +243,74 @@ class PublicacionServiceTest {
                 unaSolicitud(null, null, null), "127.0.0.1"));
 
         verify(alojamientoRepository, never()).save(any());
+    }
+
+    @Test
+    void listarMiasEscenario1_devuelveElResumenDeCadaPublicacion() {
+        Usuario mario = new Usuario("Mario", "Perez", "mario@ejemplo.com", "hash", "3000000000",
+                OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        mario.setIdUsuario(20);
+        when(usuarioRepository.findByEmail("mario@ejemplo.com")).thenReturn(Optional.of(mario));
+        Publicacion publicacion = unaPublicacion(1, 20, "Cartagena");
+        when(publicacionRepository.findByAlojamiento_Anfitrion_IdUsuarioOrderByFechaCreacionDesc(20))
+                .thenReturn(List.of(publicacion));
+
+        List<PublicacionResumenResponse> respuesta = publicacionService.listarMias("mario@ejemplo.com");
+
+        assertEquals(List.of(new PublicacionResumenResponse(1, "Apartamento frente al mar", "Cartagena",
+                new BigDecimal("320000.00"), "ACTIVA")), respuesta);
+    }
+
+    @Test
+    void listarMiasEscenario3_sinPublicacionesDevuelveListaVacia() {
+        Usuario mario = new Usuario("Mario", "Perez", "mario@ejemplo.com", "hash", "3000000000",
+                OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        mario.setIdUsuario(20);
+        when(usuarioRepository.findByEmail("mario@ejemplo.com")).thenReturn(Optional.of(mario));
+        when(publicacionRepository.findByAlojamiento_Anfitrion_IdUsuarioOrderByFechaCreacionDesc(20))
+                .thenReturn(List.of());
+
+        assertEquals(List.of(), publicacionService.listarMias("mario@ejemplo.com"));
+    }
+
+    @Test
+    void obtenerDetalleEscenario2_devuelveElDetalleCompletoConReglasEImagenesEnOrden() {
+        Usuario mario = new Usuario("Mario", "Perez", "mario@ejemplo.com", "hash", "3000000000",
+                OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        mario.setIdUsuario(20);
+        Publicacion publicacion = unaPublicacion(1, 20, "Cartagena");
+        when(usuarioRepository.findByEmail("mario@ejemplo.com")).thenReturn(Optional.of(mario));
+        when(publicacionRepository.findByIdPublicacionAndAlojamiento_Anfitrion_IdUsuario(1, 20))
+                .thenReturn(Optional.of(publicacion));
+        when(reglaAlojamientoRepository.findByPublicacion_IdPublicacionOrderByOrdenAsc(1))
+                .thenReturn(List.of(new ReglaAlojamiento(publicacion, "No fumar", (short) 1),
+                        new ReglaAlojamiento(publicacion, "No mascotas", (short) 2)));
+        when(imagenRepository.findByPublicacion_IdPublicacionOrderByOrdenAsc(1))
+                .thenReturn(List.of(new Imagen(publicacion, "portada.jpg", (short) 1, true),
+                        new Imagen(publicacion, "cocina.jpg", (short) 2, false)));
+
+        PublicacionResponse respuesta = publicacionService.obtenerDetalle("mario@ejemplo.com", 1);
+
+        assertEquals(List.of("No fumar", "No mascotas"), respuesta.reglas());
+        assertEquals(List.of("portada.jpg", "cocina.jpg"), respuesta.imagenes());
+        assertEquals("FLEXIBLE", respuesta.politicaCancelacion());
+        assertEquals("Cartagena", respuesta.ciudad());
+    }
+
+    // Mismo camino de codigo para "no existe" y "es de otro anfitrion": el
+    // metodo de PublicacionRepository ya filtra por dueno, asi que en
+    // ningun caso se distingue uno del otro (escenario 4: no se revela que
+    // una publicacion ajena existe).
+    @Test
+    void obtenerDetalleEscenario4_siNoApareceParaEseAnfitrionResponde404() {
+        Usuario mario = new Usuario("Mario", "Perez", "mario@ejemplo.com", "hash", "3000000000",
+                OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        mario.setIdUsuario(20);
+        when(usuarioRepository.findByEmail("mario@ejemplo.com")).thenReturn(Optional.of(mario));
+        when(publicacionRepository.findByIdPublicacionAndAlojamiento_Anfitrion_IdUsuario(1, 20))
+                .thenReturn(Optional.empty());
+
+        assertThrows(PublicacionNoEncontradaException.class,
+                () -> publicacionService.obtenerDetalle("mario@ejemplo.com", 1));
     }
 }

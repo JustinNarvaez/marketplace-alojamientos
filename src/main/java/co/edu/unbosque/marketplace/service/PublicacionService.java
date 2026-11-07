@@ -2,8 +2,10 @@ package co.edu.unbosque.marketplace.service;
 
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
+import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
 import co.edu.unbosque.marketplace.dto.ServicioResponse;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
+import co.edu.unbosque.marketplace.exception.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.ServicioNoEncontradoException;
 import co.edu.unbosque.marketplace.model.Alojamiento;
 import co.edu.unbosque.marketplace.model.Anfitrion;
@@ -111,6 +113,50 @@ public class PublicacionService {
 
         return aResponse(publicacion, reglas, imagenes);
     }
+    /**
+     * SCRUM-30, escenario 1 (y 3: sin publicaciones, la lista sale vacia;
+     * el mensaje y el boton de crear son responsabilidad del frontend).
+     */
+    @Transactional(readOnly = true)
+    public List<PublicacionResumenResponse> listarMias(String correo) {
+        Usuario usuario = usuarioRepository.findByEmail(correo)
+                .orElseThrow(CredencialesInvalidasException::new);
+        return publicacionRepository
+                .findByAlojamiento_Anfitrion_IdUsuarioOrderByFechaCreacionDesc(usuario.getIdUsuario())
+                .stream()
+                .map(publicacion -> new PublicacionResumenResponse(
+                        publicacion.getIdPublicacion(), publicacion.getTitulo(),
+                        publicacion.getAlojamiento().getCiudad(), publicacion.getPrecioNoche(),
+                        publicacion.getEstado().name()))
+                .toList();
+    }
+
+    /**
+     * SCRUM-30, escenarios 2 y 4. La pertenencia se resuelve en la propia
+     * consulta (PublicacionRepository): si la publicacion es de otro
+     * anfitrion, no aparece y cae en el mismo 404 que "no existe" — no hay
+     * que revelarle a nadie que una publicacion ajena existe.
+     */
+    @Transactional(readOnly = true)
+    public PublicacionResponse obtenerDetalle(String correo, Integer idPublicacion) {
+        Usuario usuario = usuarioRepository.findByEmail(correo)
+                .orElseThrow(CredencialesInvalidasException::new);
+        Publicacion publicacion = publicacionRepository
+                .findByIdPublicacionAndAlojamiento_Anfitrion_IdUsuario(idPublicacion, usuario.getIdUsuario())
+                .orElseThrow(PublicacionNoEncontradaException::new);
+
+        List<String> reglas = reglaAlojamientoRepository
+                .findByPublicacion_IdPublicacionOrderByOrdenAsc(idPublicacion).stream()
+                .map(ReglaAlojamiento::getDescripcion)
+                .toList();
+        List<String> imagenes = imagenRepository
+                .findByPublicacion_IdPublicacionOrderByOrdenAsc(idPublicacion).stream()
+                .map(Imagen::getRuta)
+                .toList();
+
+        return aResponse(publicacion, reglas, imagenes);
+    }
+
     // Si piden un id que no existe, findAllById devuelve menos servicios que ids.
     private Set<Servicio> serviciosDe(List<Integer> ids) {
         if (ids == null || ids.isEmpty()) {
