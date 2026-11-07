@@ -416,8 +416,10 @@ class DisponibilidadServiceTest {
         return publicacion;
     }
 
-    private Reserva unaReservaActiva(LocalDate llegada, LocalDate salida) {
-        return new Reserva(null, alojamiento, null, llegada, salida, (short) 2, EstadoReserva.CONFIRMADA,
+    // Pendiente: una CONFIRMADA ya tiene su periodo RESERVADO en disponibilidad
+    // (SCRUM-33 lo crea al confirmar), asi que consultar() no la vuelve a pedir.
+    private Reserva unaReservaPendiente(LocalDate llegada, LocalDate salida) {
+        return new Reserva(null, alojamiento, null, llegada, salida, (short) 2, EstadoReserva.PENDIENTE_APROBACION,
                 OffsetDateTime.now(), "clave-" + llegada, BigDecimal.ZERO, (short) 1, BigDecimal.ZERO,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
     }
@@ -427,7 +429,7 @@ class DisponibilidadServiceTest {
         when(disponibilidadRepository.findByAlojamiento_IdAlojamientoAndFechaInicioBeforeAndFechaFinAfterOrderByFechaInicio(
                 ID_ALOJAMIENTO, fin, inicio)).thenReturn(List.of());
         when(reservaRepository.findByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
-                ID_ALOJAMIENTO, DisponibilidadService.RESERVAS_ACTIVAS, fin, inicio)).thenReturn(List.of());
+                ID_ALOJAMIENTO, DisponibilidadService.RESERVAS_PENDIENTES, fin, inicio)).thenReturn(List.of());
         when(disponibilidadRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
                 ID_ALOJAMIENTO, DisponibilidadService.PERIODOS_OCUPADOS, fin, inicio)).thenReturn(false);
         when(reservaRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
@@ -454,7 +456,7 @@ class DisponibilidadServiceTest {
         when(disponibilidadRepository.findByAlojamiento_IdAlojamientoAndFechaInicioBeforeAndFechaFinAfterOrderByFechaInicio(
                 ID_ALOJAMIENTO, FIN, INICIO)).thenReturn(List.of(bloqueo));
         when(reservaRepository.findByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
-                ID_ALOJAMIENTO, DisponibilidadService.RESERVAS_ACTIVAS, FIN, INICIO)).thenReturn(List.of());
+                ID_ALOJAMIENTO, DisponibilidadService.RESERVAS_PENDIENTES, FIN, INICIO)).thenReturn(List.of());
         when(disponibilidadRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
                 ID_ALOJAMIENTO, DisponibilidadService.PERIODOS_OCUPADOS, FIN, INICIO)).thenReturn(true);
         when(reservaRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
@@ -481,7 +483,7 @@ class DisponibilidadServiceTest {
         when(disponibilidadRepository.findByAlojamiento_IdAlojamientoAndFechaInicioBeforeAndFechaFinAfterOrderByFechaInicio(
                 ID_ALOJAMIENTO, FIN, INICIO)).thenReturn(List.of(disponible));
         when(reservaRepository.findByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
-                ID_ALOJAMIENTO, DisponibilidadService.RESERVAS_ACTIVAS, FIN, INICIO)).thenReturn(List.of());
+                ID_ALOJAMIENTO, DisponibilidadService.RESERVAS_PENDIENTES, FIN, INICIO)).thenReturn(List.of());
         when(disponibilidadRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
                 ID_ALOJAMIENTO, DisponibilidadService.PERIODOS_OCUPADOS, FIN, INICIO)).thenReturn(false);
         when(reservaRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
@@ -504,11 +506,11 @@ class DisponibilidadServiceTest {
         LocalDate reservaInicio = INICIO.plusDays(5);
         LocalDate reservaFin = INICIO.plusDays(7);
         Disponibilidad bloqueo = new Disponibilidad(alojamiento, INICIO, INICIO.plusDays(2), EstadoDisponibilidad.BLOQUEADO);
-        Reserva reserva = unaReservaActiva(reservaInicio, reservaFin);
+        Reserva reserva = unaReservaPendiente(reservaInicio, reservaFin);
         when(disponibilidadRepository.findByAlojamiento_IdAlojamientoAndFechaInicioBeforeAndFechaFinAfterOrderByFechaInicio(
                 ID_ALOJAMIENTO, FIN, INICIO)).thenReturn(List.of(bloqueo));
         when(reservaRepository.findByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
-                ID_ALOJAMIENTO, DisponibilidadService.RESERVAS_ACTIVAS, FIN, INICIO)).thenReturn(List.of(reserva));
+                ID_ALOJAMIENTO, DisponibilidadService.RESERVAS_PENDIENTES, FIN, INICIO)).thenReturn(List.of(reserva));
         when(disponibilidadRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
                 ID_ALOJAMIENTO, DisponibilidadService.PERIODOS_OCUPADOS, FIN, INICIO)).thenReturn(true);
         when(reservaRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
