@@ -1,5 +1,8 @@
 package co.edu.unbosque.marketplace.service;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import co.edu.unbosque.marketplace.dto.IniciarSesionResponse;
 import co.edu.unbosque.marketplace.dto.RegistrarUsuarioRequest;
 import co.edu.unbosque.marketplace.dto.UsuarioRegistradoResponse;
@@ -23,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import co.edu.unbosque.marketplace.dto.MensajeResponse;
 import co.edu.unbosque.marketplace.exception.EnlaceRestablecimientoInvalidoException;
@@ -36,6 +40,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -75,7 +80,7 @@ class AuthServiceTest {
     @BeforeEach
     void preparar() {
         authService = new AuthService(usuarioRepository, huespedRepository, anfitrionRepository,
-                adminRepository, servicioAuditoria, passwordEncoder, servicioJwt);
+                adminRepository, servicioAuditoria, passwordEncoder, servicioJwt, false);
     }
 
     private Usuario unUsuarioActivo() {
@@ -230,6 +235,46 @@ class AuthServiceTest {
                 "SOLICITUD_RESTABLECIMIENTO", ResultadoAuditoria.EXITO, "127.0.0.1");
     }
 
+    // SCRUM-57, escenario 2: por defecto el token del enlace no llega al log.
+    @Test
+    void restablecerNoEscribeElTokenEnElLogPorDefecto() {
+        Usuario usuario = unUsuarioActivo();
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        when(servicioJwt.generarRestablecimiento(eq(7), anyString())).thenReturn("token-r");
+
+        List<String> mensajes = mensajesDeLogDe(authService);
+
+        assertTrue(mensajes.stream().noneMatch(m -> m.contains("token-r")), mensajes.toString());
+    }
+
+    // Solo en desarrollo local (app.correo-simulado.mostrar-enlace=true).
+    @Test
+    void restablecerEscribeElEnlaceSoloSiSeActivaParaDesarrollo() {
+        AuthService enDesarrollo = new AuthService(usuarioRepository, huespedRepository, anfitrionRepository,
+                adminRepository, servicioAuditoria, passwordEncoder, servicioJwt, true);
+        Usuario usuario = unUsuarioActivo();
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        when(servicioJwt.generarRestablecimiento(eq(7), anyString())).thenReturn("token-r");
+
+        List<String> mensajes = mensajesDeLogDe(enDesarrollo);
+
+        assertTrue(mensajes.stream().anyMatch(m -> m.contains("/restablecer-contrasena?token=token-r")),
+                mensajes.toString());
+    }
+
+    private static List<String> mensajesDeLogDe(AuthService servicio) {
+        Logger logger = (Logger) LoggerFactory.getLogger(AuthService.class);
+        ListAppender<ILoggingEvent> logs = new ListAppender<>();
+        logs.start();
+        logger.addAppender(logs);
+        try {
+            servicio.solicitarRestablecimiento("ana@ejemplo.com", "127.0.0.1");
+        } finally {
+            logger.detachAppender(logs);
+        }
+        return logs.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+    }
+
     @Test
     void restablecerEscenario1_correoInexistenteRespondeIgualYNoGeneraEnlace() {
         when(usuarioRepository.findByEmail("nadie@ejemplo.com")).thenReturn(Optional.empty());
@@ -294,8 +339,9 @@ class AuthServiceTest {
         assertEquals(EstadoCuenta.ACTIVA, usuario.getEstadoCuenta());
         assertEquals("token-sesion", respuesta.token());
         verify(usuarioRepository).save(usuario);
-        verify(servicioAuditoria).registrarEnTransaccionActual(usuario, TipoEventoAuditoria.AUTENTICACION,
-                "usuario", 7, "REACTIVACION_CUENTA", ResultadoAuditoria.EXITO, "127.0.0.1");
+        verify(servicioAuditoria).registrarCambioEstado(usuario, TipoEventoAuditoria.AUTENTICACION,
+                "usuario", 7, "REACTIVACION_CUENTA",
+                new ServicioAuditoria.CambioEstado("INACTIVA", "ACTIVA"), "127.0.0.1");
     }
 
     @Test

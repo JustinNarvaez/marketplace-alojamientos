@@ -73,8 +73,9 @@ class UsuarioServiceTest {
 
         assertEquals("INACTIVA", respuesta.estadoCuenta());
         verify(usuarioRepository).save(usuario);
-        verify(servicioAuditoria).registrarEnTransaccionActual(usuario, TipoEventoAuditoria.AUTENTICACION,
-                "usuario", 7, "DESACTIVACION_CUENTA", ResultadoAuditoria.EXITO, "127.0.0.1");
+        verify(servicioAuditoria).registrarCambioEstado(usuario, TipoEventoAuditoria.AUTENTICACION,
+                "usuario", 7, "DESACTIVACION_CUENTA",
+                new ServicioAuditoria.CambioEstado("ACTIVA", "INACTIVA"), "127.0.0.1");
     }
 
     @Test
@@ -100,8 +101,9 @@ class UsuarioServiceTest {
                 usuarioService.cambiarEstado("ana@ejemplo.com", EstadoCuenta.ACTIVA, "127.0.0.1");
 
         assertEquals("ACTIVA", respuesta.estadoCuenta());
-        verify(servicioAuditoria).registrarEnTransaccionActual(usuario, TipoEventoAuditoria.AUTENTICACION,
-                "usuario", 7, "REACTIVACION_CUENTA", ResultadoAuditoria.EXITO, "127.0.0.1");
+        verify(servicioAuditoria).registrarCambioEstado(usuario, TipoEventoAuditoria.AUTENTICACION,
+                "usuario", 7, "REACTIVACION_CUENTA",
+                new ServicioAuditoria.CambioEstado("INACTIVA", "ACTIVA"), "127.0.0.1");
     }
 
     @Test

@@ -26,6 +26,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -58,11 +59,13 @@ public class AuthService {
     private final ServicioAuditoria servicioAuditoria;
     private final PasswordEncoder passwordEncoder;
     private final ServicioJwt servicioJwt;
+    private final boolean mostrarEnlaceSimulado;
 
     public AuthService(UsuarioRepository usuarioRepository, HuespedRepository huespedRepository,
                         AnfitrionRepository anfitrionRepository, AdminRepository adminRepository,
                         ServicioAuditoria servicioAuditoria, PasswordEncoder passwordEncoder,
-                        ServicioJwt servicioJwt) {
+                        ServicioJwt servicioJwt,
+                        @Value("${app.correo-simulado.mostrar-enlace}") boolean mostrarEnlaceSimulado) {
         this.usuarioRepository = usuarioRepository;
         this.huespedRepository = huespedRepository;
         this.anfitrionRepository = anfitrionRepository;
@@ -70,6 +73,7 @@ public class AuthService {
         this.servicioAuditoria = servicioAuditoria;
         this.passwordEncoder = passwordEncoder;
         this.servicioJwt = servicioJwt;
+        this.mostrarEnlaceSimulado = mostrarEnlaceSimulado;
     }
 
     public IniciarSesionResponse iniciarSesion(String correo, String contrasena, String ipOrigen) {
@@ -107,10 +111,12 @@ public class AuthService {
             throw new CredencialesInvalidasException();
         }
 
+        String estadoAnterior = usuario.getEstadoCuenta().name();
         usuario.reactivar();
         usuarioRepository.save(usuario);
-        servicioAuditoria.registrarEnTransaccionActual(usuario, TipoEventoAuditoria.AUTENTICACION,
-                ENTIDAD_USUARIO, usuario.getIdUsuario(), ACCION_REACTIVACION, ResultadoAuditoria.EXITO, ipOrigen);
+        servicioAuditoria.registrarCambioEstado(usuario, TipoEventoAuditoria.AUTENTICACION,
+                ENTIDAD_USUARIO, usuario.getIdUsuario(), ACCION_REACTIVACION,
+                new ServicioAuditoria.CambioEstado(estadoAnterior, usuario.getEstadoCuenta().name()), ipOrigen);
 
         return iniciarSesion(correo, contrasena, ipOrigen);
     }
@@ -160,9 +166,12 @@ public class AuthService {
 
         if (usuario != null) {
             String token = servicioJwt.generarRestablecimiento(usuario.getIdUsuario(), huellaDe(usuario));
-            // Envio de correo simulado: el enlace queda en el log del servidor.
-            LOGGER.info("Correo simulado al usuario {}: /restablecer-contrasena?token={}",
-                    usuario.getIdUsuario(), token);
+            // Envio de correo simulado. SCRUM-57, escenario 2: el token no va
+            // al log, salvo en desarrollo local (app.correo-simulado.mostrar-enlace).
+            if (mostrarEnlaceSimulado) {
+                LOGGER.warn("[SOLO DESARROLLO] Correo simulado al usuario {}: /restablecer-contrasena?token={}",
+                        usuario.getIdUsuario(), token);
+            }
             servicioAuditoria.registrar(usuario, TipoEventoAuditoria.AUTENTICACION, ENTIDAD_USUARIO,
                     usuario.getIdUsuario(), ACCION_SOLICITUD_RESTABLECIMIENTO, ResultadoAuditoria.EXITO, ipOrigen);
         }
