@@ -74,7 +74,8 @@ public class CotizacionService {
 
         Short capacidad = publicacion.getAlojamiento().getCapacidad();
         if (request.numeroHuespedes() > capacidad) {
-            throw new CotizacionInvalidaException("Este alojamiento admite máximo " + capacidad + " huéspedes.");
+            throw new CotizacionInvalidaException("Este alojamiento admite máximo " + capacidad
+                    + (capacidad == 1 ? " huésped." : " huéspedes."));
         }
 
         // Escenario 4: si el periodo no esta libre, no se genera total.
