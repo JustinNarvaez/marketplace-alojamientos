@@ -33,7 +33,10 @@ export default function LayoutBase() {
                         </>
                     )}
                     {tieneRol('ADMINISTRADOR') && (
-                        <Button color="inherit" component={RouterLink} to="/administracion">Administración</Button>
+                        <>
+                            <Button color="inherit" component={RouterLink} to="/administracion">Administración</Button>
+                            <Button color="inherit" component={RouterLink} to="/administracion/auditoria">Auditoría</Button>
+                        </>
                     )}
                     {autenticado && (
                         <Button color="inherit" component={RouterLink} to="/mi-cuenta">Mi cuenta</Button>
