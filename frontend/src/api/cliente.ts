@@ -75,6 +75,10 @@ async function enviar(ruta: string, opciones: RequestInit = {}): Promise<Respons
 
 export async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
     const respuesta = await enviar(ruta, opciones)
+    // 204 No Content (por ejemplo un DELETE) no trae cuerpo que leer
+    if (respuesta.status === 204) {
+        return undefined as T
+    }
     return await respuesta.json() as T
 }
 

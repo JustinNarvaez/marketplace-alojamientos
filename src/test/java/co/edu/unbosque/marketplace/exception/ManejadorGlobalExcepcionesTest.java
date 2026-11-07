@@ -90,6 +90,22 @@ class ManejadorGlobalExcepcionesTest {
     }
 
     @Test
+    void periodoSuperpuestoResponde409ConElMotivo() {
+        ResponseEntity<ErrorResponse> respuesta =
+                manejador.manejar(new PeriodoSuperpuestoException("Ya hay otro periodo en esas fechas."));
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals("Ya hay otro periodo en esas fechas.", respuesta.getBody().mensaje());
+    }
+
+    @Test
+    void disponibilidadNoEncontradaResponde404() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new DisponibilidadNoEncontradaException());
+
+        assertEquals(HttpStatus.NOT_FOUND, respuesta.getStatusCode());
+    }
+
+    @Test
     void enlaceInvalidoResponde400ConMensajeClaro() {
         ResponseEntity<ErrorResponse> respuesta =
                 manejador.manejar(new EnlaceRestablecimientoInvalidoException());

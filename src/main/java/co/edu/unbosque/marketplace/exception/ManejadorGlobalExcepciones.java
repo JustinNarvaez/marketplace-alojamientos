@@ -64,6 +64,21 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(PeriodoSuperpuestoException.class)
+    public ResponseEntity<ErrorResponse> manejar(PeriodoSuperpuestoException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(DisponibilidadInvalidaException.class)
+    public ResponseEntity<ErrorResponse> manejar(DisponibilidadInvalidaException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(DisponibilidadNoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> manejar(DisponibilidadNoEncontradaException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(NoEsPropietarioException.class)
     public ResponseEntity<ErrorResponse> manejar(NoEsPropietarioException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse(ex.getMessage()));
