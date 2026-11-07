@@ -508,8 +508,9 @@ class PublicacionServiceTest {
                 "ana@ejemplo.com", 1, EstadoPublicacion.ACTIVA, "127.0.0.1");
 
         assertEquals("ACTIVA", respuesta.estado());
-        verify(servicioAuditoria).registrarEnTransaccionActual(usuario, TipoEventoAuditoria.PUBLICACION,
-                "publicacion", 1, "ACTIVACION_PUBLICACION", ResultadoAuditoria.EXITO, "127.0.0.1");
+        verify(servicioAuditoria).registrarCambioEstado(usuario, TipoEventoAuditoria.PUBLICACION,
+                "publicacion", 1, "ACTIVACION_PUBLICACION",
+                new ServicioAuditoria.CambioEstado("BORRADOR", "ACTIVA"), "127.0.0.1");
     }
 
     @Test
@@ -537,8 +538,9 @@ class PublicacionServiceTest {
                 "ana@ejemplo.com", 1, EstadoPublicacion.PAUSADA, "127.0.0.1");
 
         assertEquals("PAUSADA", respuesta.estado());
-        verify(servicioAuditoria).registrarEnTransaccionActual(usuario, TipoEventoAuditoria.PUBLICACION,
-                "publicacion", 1, "PAUSA_PUBLICACION", ResultadoAuditoria.EXITO, "127.0.0.1");
+        verify(servicioAuditoria).registrarCambioEstado(usuario, TipoEventoAuditoria.PUBLICACION,
+                "publicacion", 1, "PAUSA_PUBLICACION",
+                new ServicioAuditoria.CambioEstado("ACTIVA", "PAUSADA"), "127.0.0.1");
     }
 
     @Test

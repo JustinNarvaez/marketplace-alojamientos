@@ -165,12 +165,30 @@ Si dice `health: starting`, espera 15 segundos y repite `docker compose ps`.
 La primera vez descarga todas las dependencias de Maven; tarda varios
 minutos.
 
-**Busca estas dos líneas en el log:**
+**Busca estos dos mensajes en el log:**
 
 ```
 Migrating schema "public" to version "1 - esquema inicial"
 Started MarketplaceAlojamientosApplication in X seconds
 ```
+
+> **El log sale en JSON, una línea por evento** (SCRUM-57). Cada mensaje
+> aparece dentro del campo `"message"`, junto con `@timestamp`, `level` e
+> `idPeticion`. Los eventos de negocio (login, publicaciones, cambios de
+> estado…) agregan `evento`, `usuario`, `entidad`, `resultado` y, si cambia
+> un estado, `estadoAnterior` y `estadoNuevo`.
+
+### Probar "Olvidé mi contraseña" en local
+
+El correo es simulado y, por seguridad, el enlace con el token **no** se
+escribe en el log. Para verlo en tu computador, arranca con:
+
+```bash
+CORREO_SIMULADO_MOSTRAR_ENLACE=true ./mvnw spring-boot:run
+```
+
+y busca `[SOLO DESARROLLO] Correo simulado` en el log. Nunca actives esto
+fuera de tu máquina.
 
 > **La aplicación no termina: se queda corriendo.** Eso es lo correcto, no
 > está trabada. Es un servidor web esperando peticiones. La terminal queda

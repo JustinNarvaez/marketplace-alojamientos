@@ -34,8 +34,6 @@ import co.edu.unbosque.marketplace.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.repository.ReglaAlojamientoRepository;
 import co.edu.unbosque.marketplace.repository.ServicioRepository;
 import co.edu.unbosque.marketplace.repository.UsuarioRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,7 +47,6 @@ import java.util.Set;
 @Service
 public class PublicacionService {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(PublicacionService.class);
     private static final String POLITICA_POR_DEFECTO = "FLEXIBLE";
 
     private final UsuarioRepository usuarioRepository;
@@ -117,9 +114,8 @@ public class PublicacionService {
         List<String> reglas = guardarReglas(publicacion, request.reglas());
         List<String> imagenes = guardarImagenes(publicacion, request.imagenes());
 
-        // Escenario 4: log de aplicacion + evento en log_auditoria.
-        LOGGER.info("Publicacion creada: id={} anfitrion={} estado={}",
-                publicacion.getIdPublicacion(), usuario.getIdUsuario(), publicacion.getEstado());
+        // Escenario 4: evento en log_auditoria; ServicioAuditoria emite tambien
+        // el log de aplicacion estructurado (SCRUM-57).
         servicioAuditoria.registrarEnTransaccionActual(usuario, TipoEventoAuditoria.PUBLICACION,
                 "publicacion", publicacion.getIdPublicacion(), "CREACION_PUBLICACION",
                 ResultadoAuditoria.EXITO, ipOrigen);
@@ -252,6 +248,7 @@ public class PublicacionService {
             throw new NoEsPropietarioException();
         }
 
+        String estadoAnterior = publicacion.getEstado().name();
         String accion;
         if (nuevoEstado == EstadoPublicacion.ACTIVA) {
             boolean sinImagenes = imagenRepository
@@ -267,8 +264,9 @@ public class PublicacionService {
         }
         publicacionRepository.save(publicacion);
 
-        servicioAuditoria.registrarEnTransaccionActual(usuario, TipoEventoAuditoria.PUBLICACION,
-                "publicacion", idPublicacion, accion, ResultadoAuditoria.EXITO, ipOrigen);
+        servicioAuditoria.registrarCambioEstado(usuario, TipoEventoAuditoria.PUBLICACION, "publicacion",
+                idPublicacion, accion,
+                new ServicioAuditoria.CambioEstado(estadoAnterior, publicacion.getEstado().name()), ipOrigen);
 
         return new EstadoPublicacionResponse(publicacion.getEstado().name());
     }

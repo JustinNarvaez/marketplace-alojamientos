@@ -95,6 +95,7 @@ public class UsuarioService {
     public EstadoCuentaResponse cambiarEstado(String correo, EstadoCuenta nuevoEstado, String ipOrigen) {
         Usuario usuario = buscarPorCorreo(correo);
 
+        String estadoAnterior = usuario.getEstadoCuenta().name();
         String accion;
         if (nuevoEstado == EstadoCuenta.INACTIVA) {
             if (tieneReservasPendientes(usuario)) {
@@ -108,8 +109,9 @@ public class UsuarioService {
         }
         usuarioRepository.save(usuario);
 
-        servicioAuditoria.registrarEnTransaccionActual(usuario, TipoEventoAuditoria.AUTENTICACION,
-                ENTIDAD_USUARIO, usuario.getIdUsuario(), accion, ResultadoAuditoria.EXITO, ipOrigen);
+        servicioAuditoria.registrarCambioEstado(usuario, TipoEventoAuditoria.AUTENTICACION,
+                ENTIDAD_USUARIO, usuario.getIdUsuario(), accion,
+                new ServicioAuditoria.CambioEstado(estadoAnterior, usuario.getEstadoCuenta().name()), ipOrigen);
         return new EstadoCuentaResponse(usuario.getEstadoCuenta().name());
     }
 
