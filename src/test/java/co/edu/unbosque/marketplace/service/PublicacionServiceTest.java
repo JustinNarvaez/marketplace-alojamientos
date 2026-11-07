@@ -1,5 +1,8 @@
 package co.edu.unbosque.marketplace.service;
 
+import co.edu.unbosque.marketplace.exception.PublicacionNoDisponibleException;
+import co.edu.unbosque.marketplace.dto.ResumenResenasResponse;
+import co.edu.unbosque.marketplace.dto.DetalleAlojamientoResponse;
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
@@ -82,6 +85,8 @@ class PublicacionServiceTest {
     private ImagenRepository imagenRepository;
     @Mock
     private ServicioAuditoria servicioAuditoria;
+    @Mock
+    private ResenaService resenaService;
 
     private PublicacionService publicacionService;
     private Usuario usuario;
@@ -90,7 +95,7 @@ class PublicacionServiceTest {
     void preparar() {
         publicacionService = new PublicacionService(usuarioRepository, anfitrionRepository, adminRepository,
                 alojamientoRepository, publicacionRepository, politicaCancelacionRepository, servicioRepository,
-                reglaAlojamientoRepository, imagenRepository, servicioAuditoria);
+                reglaAlojamientoRepository, imagenRepository, servicioAuditoria, resenaService);
         usuario = new Usuario("Ana", "Gomez", "ana@ejemplo.com", "hash", "3000000000",
                 OffsetDateTime.now(), EstadoCuenta.ACTIVA);
         usuario.setIdUsuario(7);
@@ -445,5 +450,44 @@ class PublicacionServiceTest {
 
         verify(alojamientoRepository, never()).save(any());
         verify(publicacionRepository, never()).save(any());
+    }
+
+    // ===== SCRUM-35: detalle para el huesped =====
+
+    @Test
+    void obtenerParaHuespedEscenario1_devuelveElDetalleConPoliticaYResenas() {
+        Publicacion publicacion = unaPublicacion(1, 20, "Cartagena");
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(reglaAlojamientoRepository.findByPublicacion_IdPublicacionOrderByOrdenAsc(1))
+                .thenReturn(List.of(new ReglaAlojamiento(publicacion, "No fumar", (short) 1)));
+        when(imagenRepository.findByPublicacion_IdPublicacionOrderByOrdenAsc(1))
+                .thenReturn(List.of(new Imagen(publicacion, "portada.jpg", (short) 1, true)));
+        ResumenResenasResponse resenas = new ResumenResenasResponse(null, 0, List.of());
+        when(resenaService.resumenDe(1)).thenReturn(resenas);
+
+        DetalleAlojamientoResponse respuesta = publicacionService.obtenerParaHuesped(1);
+
+        assertEquals("Apartamento frente al mar", respuesta.publicacion().titulo());
+        assertEquals(List.of("No fumar"), respuesta.publicacion().reglas());
+        assertEquals(List.of("portada.jpg"), respuesta.publicacion().imagenes());
+        assertEquals("Reembolso total hasta 1 dia antes", respuesta.descripcionPoliticaCancelacion());
+        assertEquals(resenas, respuesta.resenas());
+    }
+
+    @Test
+    void obtenerParaHuespedEscenario3_siNoEstaActivaInformaQueNoEstaDisponible() {
+        Publicacion publicacion = unaPublicacion(1, 20, "Cartagena");
+        publicacion.setEstado(EstadoPublicacion.PAUSADA);
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+
+        assertThrows(PublicacionNoDisponibleException.class, () -> publicacionService.obtenerParaHuesped(1));
+        verify(resenaService, never()).resumenDe(any());
+    }
+
+    @Test
+    void obtenerParaHuespedDeUnaPublicacionQueNoExisteResponde404() {
+        when(publicacionRepository.findById(99)).thenReturn(Optional.empty());
+
+        assertThrows(PublicacionNoEncontradaException.class, () -> publicacionService.obtenerParaHuesped(99));
     }
 }

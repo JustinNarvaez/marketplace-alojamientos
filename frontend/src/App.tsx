@@ -11,7 +11,7 @@ import NoEncontrado from './paginas/NoEncontrado'
 import PaginaPendiente from './paginas/PaginaPendiente'
 import MiCuenta from './paginas/MiCuenta'
 import CrearPublicacion from './paginas/CrearPublicacion'
-import CotizarPublicacion from './paginas/CotizarPublicacion'
+import DetalleAlojamiento from './paginas/DetalleAlojamiento'
 import ServiciosAdicionales from './paginas/ServiciosAdicionales'
 import Auditoria from './paginas/Auditoria'
 import Reportes from './paginas/Reportes'
@@ -32,7 +32,7 @@ export default function App() {
 
                 <Route element={<RutaProtegida />}>
                     <Route path="mi-cuenta" element={<MiCuenta />} />
-                    <Route path="cotizar/:idPublicacion" element={<CotizarPublicacion />} />
+                    <Route path="alojamientos/:idPublicacion" element={<DetalleAlojamiento />} />
                 </Route>
 
                 <Route element={<RutaProtegida roles={['HUESPED']} />}>

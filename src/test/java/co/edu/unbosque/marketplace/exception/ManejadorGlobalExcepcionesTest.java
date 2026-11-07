@@ -106,6 +106,14 @@ class ManejadorGlobalExcepcionesTest {
     }
 
     @Test
+    void publicacionNoDisponibleResponde404ConMensajeClaro() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new PublicacionNoDisponibleException());
+
+        assertEquals(HttpStatus.NOT_FOUND, respuesta.getStatusCode());
+        assertEquals("Esta publicación ya no está disponible.", respuesta.getBody().mensaje());
+    }
+
+    @Test
     void enlaceInvalidoResponde400ConMensajeClaro() {
         ResponseEntity<ErrorResponse> respuesta =
                 manejador.manejar(new EnlaceRestablecimientoInvalidoException());

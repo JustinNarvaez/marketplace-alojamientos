@@ -1,6 +1,8 @@
 package co.edu.unbosque.marketplace.controller;
 
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
+import co.edu.unbosque.marketplace.dto.DetalleAlojamientoResponse;
+import co.edu.unbosque.marketplace.dto.ResumenResenasResponse;
 import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
@@ -94,5 +96,15 @@ class PublicacionControllerTest {
         PublicacionResponse respuesta = controller.editar(1, solicitud, principal, httpRequest);
 
         assertEquals(esperada, respuesta);
+    }
+
+    @Test
+    void obtenerParaHuespedDelegaConElId() {
+        PublicacionController controller = new PublicacionController(publicacionService);
+        DetalleAlojamientoResponse esperada = new DetalleAlojamientoResponse(null, "Reembolso total",
+                new ResumenResenasResponse(null, 0, List.of()));
+        when(publicacionService.obtenerParaHuesped(1)).thenReturn(esperada);
+
+        assertEquals(esperada, controller.obtenerParaHuesped(1));
     }
 }

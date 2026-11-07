@@ -128,6 +128,11 @@ public class Publicacion {
         this.reservaInmediata = reservaInmediata;
     }
 
+    // SCRUM-35, escenario 3: un huesped solo puede ver una publicacion ACTIVA.
+    public boolean esVisibleParaHuespedes() {
+        return estado == EstadoPublicacion.ACTIVA;
+    }
+
     public EstadoPublicacion getEstado() {
         return estado;
     }
