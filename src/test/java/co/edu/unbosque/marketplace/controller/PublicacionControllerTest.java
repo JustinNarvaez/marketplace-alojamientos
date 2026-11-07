@@ -1,6 +1,7 @@
 package co.edu.unbosque.marketplace.controller;
 
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
+import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
 import co.edu.unbosque.marketplace.model.enums.TipoAlojamiento;
@@ -73,6 +74,24 @@ class PublicacionControllerTest {
         when(publicacionService.obtenerDetalle("mario@ejemplo.com", 1)).thenReturn(esperada);
 
         PublicacionResponse respuesta = controller.obtenerDetalle(1, principal);
+
+        assertEquals(esperada, respuesta);
+    }
+
+    @Test
+    void editarDelegaConElIdElCorreoYLaIp() {
+        PublicacionController controller = new PublicacionController(publicacionService);
+        EditarPublicacionRequest solicitud = new EditarPublicacionRequest("Casa renovada", "Descripcion actualizada",
+                TipoAlojamiento.CASA, (short) 6, "Medellin", "Cra 10 # 20-30", "El Poblado",
+                new BigDecimal("450000"), null, null, null, null, null);
+        PublicacionResponse esperada = new PublicacionResponse(1, 3, "Casa renovada", "Descripcion actualizada",
+                "CASA", (short) 6, "Medellin", "Cra 10 # 20-30", "El Poblado", new BigDecimal("450000"),
+                BigDecimal.ZERO, true, "ACTIVA", "FLEXIBLE", List.of(), List.of(), List.of(), OffsetDateTime.now());
+        when(principal.getName()).thenReturn("mario@ejemplo.com");
+        when(httpRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(publicacionService.editar("mario@ejemplo.com", 1, solicitud, "127.0.0.1")).thenReturn(esperada);
+
+        PublicacionResponse respuesta = controller.editar(1, solicitud, principal, httpRequest);
 
         assertEquals(esperada, respuesta);
     }

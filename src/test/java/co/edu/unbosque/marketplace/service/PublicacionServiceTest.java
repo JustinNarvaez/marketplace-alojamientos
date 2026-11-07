@@ -1,9 +1,12 @@
 package co.edu.unbosque.marketplace.service;
 
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
+import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
+import co.edu.unbosque.marketplace.exception.NoEsPropietarioException;
+import co.edu.unbosque.marketplace.exception.PublicacionBloqueadaException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.ServicioNoEncontradoException;
 import co.edu.unbosque.marketplace.model.Alojamiento;
@@ -19,6 +22,7 @@ import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
 import co.edu.unbosque.marketplace.model.enums.ResultadoAuditoria;
 import co.edu.unbosque.marketplace.model.enums.TipoAlojamiento;
 import co.edu.unbosque.marketplace.model.enums.TipoEventoAuditoria;
+import co.edu.unbosque.marketplace.repository.AdminRepository;
 import co.edu.unbosque.marketplace.repository.AlojamientoRepository;
 import co.edu.unbosque.marketplace.repository.AnfitrionRepository;
 import co.edu.unbosque.marketplace.repository.ImagenRepository;
@@ -63,6 +67,8 @@ class PublicacionServiceTest {
     @Mock
     private AnfitrionRepository anfitrionRepository;
     @Mock
+    private AdminRepository adminRepository;
+    @Mock
     private AlojamientoRepository alojamientoRepository;
     @Mock
     private PublicacionRepository publicacionRepository;
@@ -82,8 +88,8 @@ class PublicacionServiceTest {
 
     @BeforeEach
     void preparar() {
-        publicacionService = new PublicacionService(usuarioRepository, anfitrionRepository, alojamientoRepository,
-                publicacionRepository, politicaCancelacionRepository, servicioRepository,
+        publicacionService = new PublicacionService(usuarioRepository, anfitrionRepository, adminRepository,
+                alojamientoRepository, publicacionRepository, politicaCancelacionRepository, servicioRepository,
                 reglaAlojamientoRepository, imagenRepository, servicioAuditoria);
         usuario = new Usuario("Ana", "Gomez", "ana@ejemplo.com", "hash", "3000000000",
                 OffsetDateTime.now(), EstadoCuenta.ACTIVA);
@@ -95,6 +101,13 @@ class PublicacionServiceTest {
         return new CrearPublicacionRequest("Apartamento frente al mar", "Vista al mar y wifi",
                 TipoAlojamiento.APARTAMENTO, (short) 4, "Cartagena", "Cra 1 # 2-3", "Bocagrande",
                 new BigDecimal("320000.00"), null, null, idsServicios, reglas, imagenes);
+    }
+
+    private EditarPublicacionRequest unaEdicion(List<Integer> idsServicios, List<String> reglas,
+                                                List<String> imagenes, Boolean reservaInmediata) {
+        return new EditarPublicacionRequest("Casa renovada", "Descripcion actualizada", TipoAlojamiento.CASA,
+                (short) 6, "Medellin", "Cra 10 # 20-30", "El Poblado", new BigDecimal("450000.00"),
+                new BigDecimal("50000.00"), reservaInmediata, idsServicios, reglas, imagenes);
     }
 
     private PoliticaCancelacion flexible() {
@@ -312,5 +325,125 @@ class PublicacionServiceTest {
 
         assertThrows(PublicacionNoEncontradaException.class,
                 () -> publicacionService.obtenerDetalle("mario@ejemplo.com", 1));
+    }
+
+    // Los save devuelven la misma instancia, como hace Hibernate con una entidad ya gestionada.
+    private void prepararGuardadoDeEdicion() {
+        when(alojamientoRepository.save(any(Alojamiento.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+        when(publicacionRepository.save(any(Publicacion.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+    }
+
+    @Test
+    void editarEscenario1_elDuenoActualizaLosCamposReemplazaReglasEImagenesYQuedaAuditado() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(adminRepository.existsById(7)).thenReturn(false);
+        when(servicioRepository.findAllById(Set.of(1))).thenReturn(List.of(unServicio(1, "WiFi")));
+        prepararGuardadoDeEdicion();
+
+        PublicacionResponse respuesta = publicacionService.editar("ana@ejemplo.com", 1,
+                unaEdicion(List.of(1), List.of("No fiestas"), List.of("nueva.jpg"), null), "127.0.0.1");
+
+        assertEquals("Casa renovada", respuesta.titulo());
+        assertEquals("Medellin", respuesta.ciudad());
+        assertEquals(new BigDecimal("450000.00"), respuesta.precioNoche());
+        assertEquals(1, respuesta.servicios().size());
+        assertEquals(List.of("No fiestas"), respuesta.reglas());
+        assertEquals(List.of("nueva.jpg"), respuesta.imagenes());
+        verify(reglaAlojamientoRepository).deleteByPublicacion_IdPublicacion(1);
+        verify(imagenRepository).deleteByPublicacion_IdPublicacion(1);
+        verify(servicioAuditoria).registrarEnTransaccionActual(usuario, TipoEventoAuditoria.PUBLICACION,
+                "publicacion", 1, "EDICION_PUBLICACION", ResultadoAuditoria.EXITO, "127.0.0.1");
+    }
+
+    // Regresion: el formulario no expone reservaInmediata, asi que un null
+    // aqui no puede significar "vuelve a true" (ver crear()) o cada edicion
+    // apagaria en silencio el valor que el anfitrion ya habia puesto.
+    @Test
+    void editarPreservaReservaInmediataSiNoViajaEnElRequest() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        publicacion.setReservaInmediata(Boolean.FALSE);
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(adminRepository.existsById(7)).thenReturn(false);
+        prepararGuardadoDeEdicion();
+
+        PublicacionResponse respuesta = publicacionService.editar("ana@ejemplo.com", 1,
+                unaEdicion(null, null, null, null), "127.0.0.1");
+
+        assertFalse(respuesta.reservaInmediata());
+    }
+
+    @Test
+    void editarUnAdministradorPuedeEditarUnaPublicacionBloqueadaDeOtroAnfitrion() {
+        Usuario admin = new Usuario("Carla", "Admin", "carla@ejemplo.com", "hash", "3000000000",
+                OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        admin.setIdUsuario(99);
+        when(usuarioRepository.findByEmail("carla@ejemplo.com")).thenReturn(Optional.of(admin));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        publicacion.setEstado(EstadoPublicacion.BLOQUEADA);
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(adminRepository.existsById(99)).thenReturn(true);
+        prepararGuardadoDeEdicion();
+
+        PublicacionResponse respuesta = publicacionService.editar("carla@ejemplo.com", 1,
+                unaEdicion(null, null, null, null), "127.0.0.1");
+
+        assertEquals("Casa renovada", respuesta.titulo());
+    }
+
+    @Test
+    void editarEscenario2_siNoEsDuenoNiAdministradorLanza403() {
+        Usuario otraAnfitriona = new Usuario("Laura", "Diaz", "laura@ejemplo.com", "hash", "3000000000",
+                OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        otraAnfitriona.setIdUsuario(55);
+        when(usuarioRepository.findByEmail("laura@ejemplo.com")).thenReturn(Optional.of(otraAnfitriona));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(adminRepository.existsById(55)).thenReturn(false);
+
+        assertThrows(NoEsPropietarioException.class, () -> publicacionService.editar("laura@ejemplo.com", 1,
+                unaEdicion(null, null, null, null), "127.0.0.1"));
+
+        verify(publicacionRepository, never()).save(any());
+    }
+
+    @Test
+    void editarEscenario4_elDuenoNoPuedeEditarUnaPublicacionBloqueada() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        publicacion.setEstado(EstadoPublicacion.BLOQUEADA);
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(adminRepository.existsById(7)).thenReturn(false);
+
+        assertThrows(PublicacionBloqueadaException.class, () -> publicacionService.editar("ana@ejemplo.com", 1,
+                unaEdicion(null, null, null, null), "127.0.0.1"));
+
+        verify(publicacionRepository, never()).save(any());
+    }
+
+    @Test
+    void editarSiLaPublicacionNoExisteResponde404() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        when(publicacionRepository.findById(1)).thenReturn(Optional.empty());
+
+        assertThrows(PublicacionNoEncontradaException.class, () -> publicacionService.editar("ana@ejemplo.com", 1,
+                unaEdicion(null, null, null, null), "127.0.0.1"));
+    }
+
+    @Test
+    void editarUnServicioInexistenteRechazaYNoGuardaNada() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(adminRepository.existsById(7)).thenReturn(false);
+        when(servicioRepository.findAllById(Set.of(99))).thenReturn(List.of());
+
+        assertThrows(ServicioNoEncontradoException.class, () -> publicacionService.editar("ana@ejemplo.com", 1,
+                unaEdicion(List.of(99), null, null, null), "127.0.0.1"));
+
+        verify(alojamientoRepository, never()).save(any());
+        verify(publicacionRepository, never()).save(any());
     }
 }

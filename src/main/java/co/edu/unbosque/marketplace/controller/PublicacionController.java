@@ -1,6 +1,7 @@
 package co.edu.unbosque.marketplace.controller;
 
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
+import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.ErrorResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
@@ -19,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -83,5 +85,28 @@ public class PublicacionController {
     @GetMapping("/mine/{id}")
     public PublicacionResponse obtenerDetalle(@PathVariable Integer id, Principal principal) {
         return publicacionService.obtenerDetalle(principal.getName(), id);
+    }
+
+    // El ANFITRION solo edita la suya; el ADMINISTRADOR, cualquiera
+    // (incluida una BLOQUEADA, para poder corregirla o desbloquearla).
+    @Operation(summary = "Editar una publicación",
+            description = "El ANFITRION dueño o un ADMINISTRADOR. El dueño no puede editar una publicación BLOQUEADA.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Publicación actualizada"),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos o servicio inexistente",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Falta el token o ya venció",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "No es el dueño de la publicación ni ADMINISTRADOR",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "La publicación no existe",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "La publicación está BLOQUEADA",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    })
+    @PutMapping("/{id}")
+    public PublicacionResponse editar(@PathVariable Integer id, @Valid @RequestBody EditarPublicacionRequest request,
+                                      Principal principal, HttpServletRequest httpRequest) {
+        return publicacionService.editar(principal.getName(), id, request, httpRequest.getRemoteAddr());
     }
 }

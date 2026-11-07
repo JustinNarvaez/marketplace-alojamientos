@@ -69,6 +69,11 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(PublicacionBloqueadaException.class)
+    public ResponseEntity<ErrorResponse> manejar(PublicacionBloqueadaException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(ServicioAdicionalDuplicadoException.class)
     public ResponseEntity<ErrorResponse> manejar(ServicioAdicionalDuplicadoException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));

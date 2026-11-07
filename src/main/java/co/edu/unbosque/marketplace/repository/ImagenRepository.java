@@ -8,4 +8,6 @@ import java.util.List;
 public interface ImagenRepository extends JpaRepository<Imagen, Integer> {
 
     List<Imagen> findByPublicacion_IdPublicacionOrderByOrdenAsc(Integer idPublicacion);
+
+    void deleteByPublicacion_IdPublicacion(Integer idPublicacion);
 }
