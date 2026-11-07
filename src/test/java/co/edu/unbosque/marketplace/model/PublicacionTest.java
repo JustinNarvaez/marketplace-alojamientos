@@ -85,4 +85,15 @@ class PublicacionTest {
         assertThrows(PublicacionNoActivaException.class, publicacion::pausar);
         assertEquals(EstadoPublicacion.BLOQUEADA, publicacion.getEstado());
     }
+
+    // SCRUM-35, escenario 3: solo una publicacion ACTIVA la puede ver un huesped.
+    @Test
+    void soloLaActivaEsVisibleParaHuespedes() {
+        for (EstadoPublicacion estado : EstadoPublicacion.values()) {
+            Publicacion publicacion = new Publicacion(null, null, "Casa", "Casa amplia",
+                    new BigDecimal("100000"), BigDecimal.ZERO, Boolean.TRUE, estado, OffsetDateTime.now(), null);
+
+            assertEquals(estado == EstadoPublicacion.ACTIVA, publicacion.esVisibleParaHuespedes(), estado.name());
+        }
+    }
 }

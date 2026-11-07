@@ -2,6 +2,7 @@ package co.edu.unbosque.marketplace.controller;
 
 import co.edu.unbosque.marketplace.dto.CambiarEstadoPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
+import co.edu.unbosque.marketplace.dto.DetalleAlojamientoResponse;
 import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.ErrorResponse;
 import co.edu.unbosque.marketplace.dto.EstadoPublicacionResponse;
@@ -112,6 +113,21 @@ public class PublicacionController {
     public PublicacionResponse editar(@PathVariable Integer id, @Valid @RequestBody EditarPublicacionRequest request,
                                       Principal principal, HttpServletRequest httpRequest) {
         return publicacionService.editar(principal.getName(), id, request, httpRequest.getRemoteAddr());
+    }
+
+    // SCRUM-35: el detalle publico que ve el huesped. El del anfitrion es /mine/{id}.
+    @Operation(summary = "Ver el detalle de un alojamiento",
+            description = "Para el huésped: publicación ACTIVA con sus reseñas visibles y la política de cancelación.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Detalle con reseñas y calificación promedio"),
+            @ApiResponse(responseCode = "401", description = "Falta el token o ya venció",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "La publicación no existe o ya no está disponible",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    })
+    @GetMapping("/{id}")
+    public DetalleAlojamientoResponse obtenerParaHuesped(@PathVariable Integer id) {
+        return publicacionService.obtenerParaHuesped(id);
     }
 
     // Solo el ANFITRION dueño; esta historia no menciona ADMINISTRADOR.

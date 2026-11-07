@@ -54,6 +54,11 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(PublicacionNoDisponibleException.class)
+    public ResponseEntity<ErrorResponse> manejar(PublicacionNoDisponibleException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(PublicacionNoEncontradaException.class)
     public ResponseEntity<ErrorResponse> manejar(PublicacionNoEncontradaException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
