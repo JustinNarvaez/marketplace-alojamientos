@@ -1,10 +1,13 @@
 package co.edu.unbosque.marketplace.service;
 
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
+import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
 import co.edu.unbosque.marketplace.dto.ServicioResponse;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
+import co.edu.unbosque.marketplace.exception.NoEsPropietarioException;
+import co.edu.unbosque.marketplace.exception.PublicacionBloqueadaException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.ServicioNoEncontradoException;
 import co.edu.unbosque.marketplace.model.Alojamiento;
@@ -18,6 +21,7 @@ import co.edu.unbosque.marketplace.model.Usuario;
 import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
 import co.edu.unbosque.marketplace.model.enums.ResultadoAuditoria;
 import co.edu.unbosque.marketplace.model.enums.TipoEventoAuditoria;
+import co.edu.unbosque.marketplace.repository.AdminRepository;
 import co.edu.unbosque.marketplace.repository.AlojamientoRepository;
 import co.edu.unbosque.marketplace.repository.AnfitrionRepository;
 import co.edu.unbosque.marketplace.repository.ImagenRepository;
@@ -46,6 +50,7 @@ public class PublicacionService {
 
     private final UsuarioRepository usuarioRepository;
     private final AnfitrionRepository anfitrionRepository;
+    private final AdminRepository adminRepository;
     private final AlojamientoRepository alojamientoRepository;
     private final PublicacionRepository publicacionRepository;
     private final PoliticaCancelacionRepository politicaCancelacionRepository;
@@ -55,7 +60,7 @@ public class PublicacionService {
     private final ServicioAuditoria servicioAuditoria;
 
     public PublicacionService(UsuarioRepository usuarioRepository, AnfitrionRepository anfitrionRepository,
-                              AlojamientoRepository alojamientoRepository,
+                              AdminRepository adminRepository, AlojamientoRepository alojamientoRepository,
                               PublicacionRepository publicacionRepository,
                               PoliticaCancelacionRepository politicaCancelacionRepository,
                               ServicioRepository servicioRepository,
@@ -63,6 +68,7 @@ public class PublicacionService {
                               ImagenRepository imagenRepository, ServicioAuditoria servicioAuditoria) {
         this.usuarioRepository = usuarioRepository;
         this.anfitrionRepository = anfitrionRepository;
+        this.adminRepository = adminRepository;
         this.alojamientoRepository = alojamientoRepository;
         this.publicacionRepository = publicacionRepository;
         this.politicaCancelacionRepository = politicaCancelacionRepository;
@@ -153,6 +159,71 @@ public class PublicacionService {
                 .findByPublicacion_IdPublicacionOrderByOrdenAsc(idPublicacion).stream()
                 .map(Imagen::getRuta)
                 .toList();
+
+        return aResponse(publicacion, reglas, imagenes);
+    }
+
+    /**
+     * SCRUM-28. A diferencia de obtenerDetalle, aqui si hay que distinguir
+     * "no existe" (404) de "no es tuya" (403): el Escenario 2 pide 403
+     * explicitamente. El ADMINISTRADOR se salta tanto el chequeo de dueno
+     * como el de BLOQUEADA (Escenario 4 solo restringe al ANFITRION).
+     */
+    @Transactional
+    public PublicacionResponse editar(String correo, Integer idPublicacion, EditarPublicacionRequest request,
+                                      String ipOrigen) {
+        Usuario usuario = usuarioRepository.findByEmail(correo)
+                .orElseThrow(CredencialesInvalidasException::new);
+        Publicacion publicacion = publicacionRepository.findById(idPublicacion)
+                .orElseThrow(PublicacionNoEncontradaException::new);
+
+        boolean esAdmin = adminRepository.existsById(usuario.getIdUsuario());
+        if (!esAdmin) {
+            Integer idDueno = publicacion.getAlojamiento().getAnfitrion().getUsuario().getIdUsuario();
+            if (!idDueno.equals(usuario.getIdUsuario())) {
+                throw new NoEsPropietarioException();
+            }
+            if (publicacion.getEstado() == EstadoPublicacion.BLOQUEADA) {
+                throw new PublicacionBloqueadaException();
+            }
+        }
+
+        Set<Servicio> servicios = serviciosDe(request.idsServicios());
+
+        Alojamiento alojamiento = publicacion.getAlojamiento();
+        alojamiento.setTipoAlojamiento(request.tipoAlojamiento());
+        alojamiento.setCapacidad(request.capacidad());
+        alojamiento.setCiudad(request.ciudad());
+        alojamiento.setDireccion(request.direccion());
+        alojamiento.setUbicacion(request.ubicacion());
+        alojamientoRepository.save(alojamiento);
+
+        publicacion.setTitulo(request.titulo());
+        publicacion.setDescripcion(request.descripcion());
+        publicacion.setPrecioNoche(request.precioNoche());
+        publicacion.setTarifaLimpieza(Objects.requireNonNullElse(request.tarifaLimpieza(), BigDecimal.ZERO));
+        // El formulario no expone este campo: un null no significa "vuelve a
+        // true", significa "no lo toques".
+        publicacion.setReservaInmediata(
+                Objects.requireNonNullElse(request.reservaInmediata(), publicacion.getReservaInmediata()));
+        publicacion.setServicios(servicios);
+        publicacion = publicacionRepository.save(publicacion);
+
+        // El flush es obligatorio: deleteByXxx aqui no es un DELETE en bloque,
+        // borra entidad por entidad (remove()) y Hibernate difiere ambas cosas
+        // al flush. Sin forzarlo, el flush ejecuta los INSERT de guardarImagenes
+        // antes que estos DELETE y choca con uq_imagen_una_portada (una sola
+        // portada por publicacion).
+        reglaAlojamientoRepository.deleteByPublicacion_IdPublicacion(idPublicacion);
+        reglaAlojamientoRepository.flush();
+        List<String> reglas = guardarReglas(publicacion, request.reglas());
+        imagenRepository.deleteByPublicacion_IdPublicacion(idPublicacion);
+        imagenRepository.flush();
+        List<String> imagenes = guardarImagenes(publicacion, request.imagenes());
+
+        servicioAuditoria.registrarEnTransaccionActual(usuario, TipoEventoAuditoria.PUBLICACION,
+                "publicacion", publicacion.getIdPublicacion(), "EDICION_PUBLICACION",
+                ResultadoAuditoria.EXITO, ipOrigen);
 
         return aResponse(publicacion, reglas, imagenes);
     }

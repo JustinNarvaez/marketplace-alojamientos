@@ -41,6 +41,7 @@ export default function App() {
                     <Route path="mis-publicaciones" element={<MisPublicaciones />} />
                     <Route path="mis-publicaciones/nueva" element={<CrearPublicacion />} />
                     <Route path="mis-publicaciones/:idPublicacion/extras" element={<ServiciosAdicionales />} />
+                    <Route path="mis-publicaciones/:id/editar" element={<CrearPublicacion />} />
                     <Route path="mis-publicaciones/:id" element={<DetallePublicacion />} />
                 </Route>
                 <Route element={<RutaProtegida roles={['ADMINISTRADOR']} />}>

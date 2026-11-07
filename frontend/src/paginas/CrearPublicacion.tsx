@@ -13,7 +13,7 @@ import {
     TextField,
     Typography,
 } from '@mui/material'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { pedir, ErrorApi } from '../api/cliente'
 
 // Coinciden con los DTO del backend (los DTO son el contrato)
@@ -27,6 +27,22 @@ interface RespuestaPublicacion {
     idPublicacion: number
     titulo: string
     estado: string
+}
+
+// Lo que trae GET /listings/mine/:id para precargar el formulario (SCRUM-28)
+interface PublicacionExistente {
+    titulo: string
+    descripcion: string
+    tipoAlojamiento: string
+    capacidad: number
+    ciudad: string
+    direccion: string
+    ubicacion: string | null
+    precioNoche: number
+    tarifaLimpieza: number
+    servicios: Servicio[]
+    reglas: string[]
+    imagenes: string[]
 }
 
 const TIPOS = [
@@ -90,9 +106,13 @@ function erroresDe(f: Formulario): Errores {
     }
     return errores
 }
-// SCRUM-27, escenario 5: formulario de creacion de publicacion (solo ANFITRION).
+// SCRUM-27 (crear) y SCRUM-28 (editar): mismo formulario para las dos
+// historias. Con :id en la ruta precarga la publicacion y guarda con PUT;
+// sin :id crea una nueva con POST, igual que antes.
 export default function CrearPublicacion() {
     const navegar = useNavigate()
+    const { id } = useParams()
+    const editando = id !== undefined
     const [formulario, setFormulario] = useState<Formulario>(FORMULARIO_VACIO)
     const [servicios, setServicios] = useState<Servicio[]>([])
     const [seleccionados, setSeleccionados] = useState<number[]>([])
@@ -100,6 +120,7 @@ export default function CrearPublicacion() {
     const [error, setError] = useState<string | null>(null)
     const [creada, setCreada] = useState<RespuestaPublicacion | null>(null)
     const [enviando, setEnviando] = useState(false)
+    const [cargando, setCargando] = useState(editando)
 
     // Catalogo de servicios para las casillas (GET /api/servicios)
     useEffect(() => {
@@ -107,6 +128,30 @@ export default function CrearPublicacion() {
             .then(setServicios)
             .catch(() => setServicios([]))
     }, [])
+
+    // SCRUM-28: precarga los datos actuales de la publicacion a editar.
+    useEffect(() => {
+        if (!editando) return
+        pedir<PublicacionExistente>(`/listings/mine/${id}`)
+            .then((publicacion) => {
+                setFormulario({
+                    titulo: publicacion.titulo,
+                    descripcion: publicacion.descripcion,
+                    tipoAlojamiento: publicacion.tipoAlojamiento,
+                    capacidad: String(publicacion.capacidad),
+                    ciudad: publicacion.ciudad,
+                    direccion: publicacion.direccion,
+                    ubicacion: publicacion.ubicacion ?? '',
+                    precioNoche: String(publicacion.precioNoche),
+                    tarifaLimpieza: String(publicacion.tarifaLimpieza),
+                    reglas: publicacion.reglas.join('\n'),
+                    imagenes: publicacion.imagenes.join('\n'),
+                })
+                setSeleccionados(publicacion.servicios.map((servicio) => servicio.idServicio))
+            })
+            .catch((err) => setError(err instanceof ErrorApi ? err.message : 'No pudimos cargar la publicación.'))
+            .finally(() => setCargando(false))
+    }, [editando, id])
 
     const errores: Errores = intentoEnviar ? erroresDe(formulario) : {}
 
@@ -122,24 +167,31 @@ export default function CrearPublicacion() {
             return
         }
 
+        const cuerpo = {
+            titulo: formulario.titulo,
+            descripcion: formulario.descripcion,
+            tipoAlojamiento: formulario.tipoAlojamiento,
+            capacidad: Number(formulario.capacidad),
+            ciudad: formulario.ciudad,
+            direccion: formulario.direccion,
+            ubicacion: formulario.ubicacion || null,
+            precioNoche: Number(formulario.precioNoche),
+            tarifaLimpieza: formulario.tarifaLimpieza === '' ? null : Number(formulario.tarifaLimpieza),
+            idsServicios: seleccionados,
+            reglas: lineas(formulario.reglas),
+            imagenes: lineas(formulario.imagenes),
+        }
+
         setEnviando(true)
         try {
+            if (editando) {
+                await pedir<RespuestaPublicacion>(`/listings/${id}`, { method: 'PUT', body: JSON.stringify(cuerpo) })
+                navegar(`/mis-publicaciones/${id}`)
+                return
+            }
             const respuesta = await pedir<RespuestaPublicacion>('/listings', {
                 method: 'POST',
-                body: JSON.stringify({
-                    titulo: formulario.titulo,
-                    descripcion: formulario.descripcion,
-                    tipoAlojamiento: formulario.tipoAlojamiento,
-                    capacidad: Number(formulario.capacidad),
-                    ciudad: formulario.ciudad,
-                    direccion: formulario.direccion,
-                    ubicacion: formulario.ubicacion || null,
-                    precioNoche: Number(formulario.precioNoche),
-                    tarifaLimpieza: formulario.tarifaLimpieza === '' ? null : Number(formulario.tarifaLimpieza),
-                    idsServicios: seleccionados,
-                    reglas: lineas(formulario.reglas),
-                    imagenes: lineas(formulario.imagenes),
-                }),
+                body: JSON.stringify(cuerpo),
             })
             setCreada(respuesta)
             setFormulario(FORMULARIO_VACIO)
@@ -165,12 +217,18 @@ export default function CrearPublicacion() {
         fullWidth: true,
     })
 
+    if (cargando) {
+        return null
+    }
+
     return (
         <Paper sx={{ p: 4, maxWidth: 720, mx: 'auto' }}>
-            <Typography variant="h5" gutterBottom>Nueva publicación</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                La publicación queda como borrador hasta que la actives.
-            </Typography>
+            <Typography variant="h5" gutterBottom>{editando ? 'Editar publicación' : 'Nueva publicación'}</Typography>
+            {!editando && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    La publicación queda como borrador hasta que la actives.
+                </Typography>
+            )}
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             {creada && (
                 <Alert severity="success" sx={{ mb: 2 }}>
@@ -220,9 +278,11 @@ export default function CrearPublicacion() {
 
                 <Stack direction="row" spacing={2}>
                     <Button type="submit" variant="contained" disabled={enviando}>
-                        {enviando ? 'Guardando…' : 'Crear publicación'}
+                        {enviando ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear publicación'}
                     </Button>
-                    <Button onClick={() => navegar('/mis-publicaciones')}>Cancelar</Button>
+                    <Button onClick={() => navegar(editando ? `/mis-publicaciones/${id}` : '/mis-publicaciones')}>
+                        Cancelar
+                    </Button>
                 </Stack>
             </Stack>
         </Paper>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Alert, Box, Chip, Divider, List, ListItem, ListItemText, Paper, Stack, Typography } from '@mui/material'
-import { useParams } from 'react-router-dom'
+import { Alert, Box, Button, Chip, Divider, List, ListItem, ListItemText, Paper, Stack, Typography } from '@mui/material'
+import { useNavigate, useParams } from 'react-router-dom'
 import { pedir, ErrorApi } from '../api/cliente'
 
 // Coinciden con PublicacionResponse del backend (SCRUM-27/30, los DTO son el contrato)
@@ -32,6 +32,7 @@ interface PublicacionDetalle {
 // (SCRUM-27 solo las guardaba; aqui es donde por fin se ven).
 export default function DetallePublicacion() {
     const { id } = useParams()
+    const navegar = useNavigate()
     const [publicacion, setPublicacion] = useState<PublicacionDetalle | null>(null)
     const [error, setError] = useState<string | null>(null)
 
@@ -57,7 +58,10 @@ export default function DetallePublicacion() {
         <Paper sx={{ p: 4, maxWidth: 720, mx: 'auto' }}>
             <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                 <Typography variant="h5">{publicacion.titulo}</Typography>
-                <Chip label={publicacion.estado} color={publicacion.estado === 'ACTIVA' ? 'success' : 'default'} />
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                    <Chip label={publicacion.estado} color={publicacion.estado === 'ACTIVA' ? 'success' : 'default'} />
+                    <Button size="small" onClick={() => navegar(`/mis-publicaciones/${id}/editar`)}>Editar</Button>
+                </Stack>
             </Stack>
             <Typography color="text.secondary" sx={{ mb: 2 }}>
                 {publicacion.ciudad} · {publicacion.direccion}
