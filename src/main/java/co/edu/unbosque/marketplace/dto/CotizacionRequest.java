@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
+import java.util.List;
 
 // SCRUM-36. Que la salida sea posterior a la llegada (escenario 3) lo valida
 // CotizacionService, porque compara dos campos.
@@ -21,5 +22,8 @@ public record CotizacionRequest(
 
         @NotNull(message = "El número de huéspedes es obligatorio.")
         @Min(value = 1, message = "Debe haber al menos 1 huésped.")
-        Short numeroHuespedes
+        Short numeroHuespedes,
+
+        // SCRUM-37: extras que el huesped marco (opcional).
+        List<Integer> idsServiciosAdicionales
 ) {}

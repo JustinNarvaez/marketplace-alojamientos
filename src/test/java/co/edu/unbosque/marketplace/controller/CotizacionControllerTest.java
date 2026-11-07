@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
@@ -24,10 +25,10 @@ class CotizacionControllerTest {
     void cotizarDelegaEnElServicio() {
         CotizacionController controller = new CotizacionController(cotizacionService);
         LocalDate llegada = LocalDate.now().plusDays(10);
-        CotizacionRequest solicitud = new CotizacionRequest(1, llegada, llegada.plusDays(3), (short) 2);
+        CotizacionRequest solicitud = new CotizacionRequest(1, llegada, llegada.plusDays(3), (short) 2, null);
         CotizacionResponse esperada = new CotizacionResponse(1, llegada, llegada.plusDays(3), (short) 2, 3,
                 new BigDecimal("100000"), new BigDecimal("300000"), new BigDecimal("50000"),
-                new BigDecimal("30000"), BigDecimal.ZERO, new BigDecimal("380000"));
+                new BigDecimal("30000"), List.of(), BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("380000"));
         when(cotizacionService.cotizar(solicitud)).thenReturn(esperada);
 
         assertEquals(esperada, controller.cotizar(solicitud));

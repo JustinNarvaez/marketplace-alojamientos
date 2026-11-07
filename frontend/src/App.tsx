@@ -12,6 +12,7 @@ import PaginaPendiente from './paginas/PaginaPendiente'
 import MiCuenta from './paginas/MiCuenta'
 import CrearPublicacion from './paginas/CrearPublicacion'
 import CotizarPublicacion from './paginas/CotizarPublicacion'
+import ServiciosAdicionales from './paginas/ServiciosAdicionales'
 import Auditoria from './paginas/Auditoria'
 
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
                 <Route element={<RutaProtegida roles={['ANFITRION']} />}>
                     <Route path="mis-publicaciones" element={<PaginaPendiente titulo="Mis publicaciones" />} />
                     <Route path="mis-publicaciones/nueva" element={<CrearPublicacion />} />
+                    <Route path="mis-publicaciones/:idPublicacion/extras" element={<ServiciosAdicionales />} />
                 </Route>
                 <Route element={<RutaProtegida roles={['ADMINISTRADOR']} />}>
                     <Route path="administracion" element={<PaginaPendiente titulo="Administración" />} />

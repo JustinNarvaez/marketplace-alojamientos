@@ -130,6 +130,22 @@ class ManejadorGlobalExcepcionesTest {
         assertEquals("El alojamiento no está disponible en esas fechas. Prueba con otras.", respuesta.getBody().mensaje());
     }
 
+    @Test
+    void noEsPropietarioResponde403() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new NoEsPropietarioException());
+
+        assertEquals(HttpStatus.FORBIDDEN, respuesta.getStatusCode());
+        assertEquals("Solo el anfitrión dueño de la publicación puede modificarla.", respuesta.getBody().mensaje());
+    }
+
+    @Test
+    void servicioAdicionalDuplicadoResponde400() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new ServicioAdicionalDuplicadoException("Desayuno"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, respuesta.getStatusCode());
+        assertEquals("El servicio adicional \"Desayuno\" está repetido.", respuesta.getBody().mensaje());
+    }
+
     @AfterEach
     void limpiarMdc() {
         MDC.clear();

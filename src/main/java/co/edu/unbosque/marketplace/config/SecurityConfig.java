@@ -59,6 +59,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/servicios").hasRole("ADMINISTRADOR")
                         .requestMatchers(HttpMethod.POST, "/api/listings").hasRole("ANFITRION")
+                        .requestMatchers(HttpMethod.PUT, "/api/listings/*/extras").hasRole("ANFITRION")
                         .requestMatchers("/api/admin/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()

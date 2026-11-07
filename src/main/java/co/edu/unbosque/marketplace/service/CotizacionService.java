@@ -6,12 +6,14 @@ import co.edu.unbosque.marketplace.exception.CotizacionInvalidaException;
 import co.edu.unbosque.marketplace.exception.PeriodoNoDisponibleException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.model.Publicacion;
+import co.edu.unbosque.marketplace.model.ServicioAdicional;
 import co.edu.unbosque.marketplace.model.enums.EstadoDisponibilidad;
 import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
 import co.edu.unbosque.marketplace.repository.DisponibilidadRepository;
 import co.edu.unbosque.marketplace.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.repository.ReservaRepository;
+import co.edu.unbosque.marketplace.repository.ServicioAdicionalRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +22,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * SCRUM-36: cotizacion con desglose. No guarda nada: es una consulta.
@@ -40,6 +44,7 @@ public class CotizacionService {
     private final PublicacionRepository publicacionRepository;
     private final DisponibilidadRepository disponibilidadRepository;
     private final ReservaRepository reservaRepository;
+    private final ServicioAdicionalRepository servicioAdicionalRepository;
     // Escenario 2: vienen de application.properties, no del codigo.
     private final BigDecimal porcentajeServicio;
     private final BigDecimal porcentajeDescuento;
@@ -48,12 +53,14 @@ public class CotizacionService {
     public CotizacionService(PublicacionRepository publicacionRepository,
                              DisponibilidadRepository disponibilidadRepository,
                              ReservaRepository reservaRepository,
+                             ServicioAdicionalRepository servicioAdicionalRepository,
                              @Value("${app.cotizacion.porcentaje-servicio}") BigDecimal porcentajeServicio,
                              @Value("${app.cotizacion.porcentaje-descuento}") BigDecimal porcentajeDescuento,
                              @Value("${app.cotizacion.noches-para-descuento}") int nochesParaDescuento) {
         this.publicacionRepository = publicacionRepository;
         this.disponibilidadRepository = disponibilidadRepository;
         this.reservaRepository = reservaRepository;
+        this.servicioAdicionalRepository = servicioAdicionalRepository;
         this.porcentajeServicio = porcentajeServicio;
         this.porcentajeDescuento = porcentajeDescuento;
         this.nochesParaDescuento = nochesParaDescuento;
@@ -84,7 +91,26 @@ public class CotizacionService {
             throw new PeriodoNoDisponibleException();
         }
 
-        return calcular(publicacion, request);
+        List<ServicioAdicional> extras = extrasDe(publicacion, request.idsServiciosAdicionales());
+        return calcular(publicacion, request, extras);
+    }
+
+    // SCRUM-37: solo extras activos de esta misma publicacion. Si el huesped
+    // manda uno que no existe, es de otra publicacion o el anfitrion lo
+    // desactivo, findAllBy... devuelve menos de los pedidos.
+    private List<ServicioAdicional> extrasDe(Publicacion publicacion, List<Integer> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        Set<Integer> idsSinRepetir = new HashSet<>(ids);
+        List<ServicioAdicional> extras = servicioAdicionalRepository
+                .findByPublicacion_IdPublicacionAndActivoTrueAndIdServicioAdicionalIn(
+                        publicacion.getIdPublicacion(), idsSinRepetir);
+        if (extras.size() != idsSinRepetir.size()) {
+            throw new CotizacionInvalidaException(
+                    "Alguno de los servicios adicionales no está disponible para esta publicación.");
+        }
+        return extras;
     }
 
     private boolean estaDisponible(Integer idAlojamiento, LocalDate llegada, LocalDate salida) {
@@ -102,7 +128,8 @@ public class CotizacionService {
      * Todo con BigDecimal: con double, 0.1 + 0.2 da 0.30000000000000004,
      * y en plata eso no se puede.
      */
-    private CotizacionResponse calcular(Publicacion publicacion, CotizacionRequest request) {
+    private CotizacionResponse calcular(Publicacion publicacion, CotizacionRequest request,
+                                        List<ServicioAdicional> extras)  {
         int noches = (int) ChronoUnit.DAYS.between(request.fechaLlegada(), request.fechaSalida());
         BigDecimal precioNoche = publicacion.getPrecioNoche();
         BigDecimal subtotal = precioNoche.multiply(BigDecimal.valueOf(noches));
@@ -111,12 +138,17 @@ public class CotizacionService {
         BigDecimal descuento = noches >= nochesParaDescuento
                 ? porcentajeDe(subtotal, porcentajeDescuento)
                 : BigDecimal.ZERO;
-        BigDecimal total = subtotal.add(limpieza).add(servicio).subtract(descuento);
+        // SCRUM-37: cada extra se cobra una vez por estancia.
+        BigDecimal totalExtras = extras.stream()
+                .map(ServicioAdicional::getPrecio)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = subtotal.add(limpieza).add(servicio).add(totalExtras).subtract(descuento);
 
         return new CotizacionResponse(publicacion.getIdPublicacion(), request.fechaLlegada(),
                 request.fechaSalida(), request.numeroHuespedes(), noches,
                 dosDecimales(precioNoche), dosDecimales(subtotal), dosDecimales(limpieza),
-                dosDecimales(servicio), dosDecimales(descuento), dosDecimales(total));
+                dosDecimales(servicio), extras.stream().map(ServicioAdicionalService::aResponse).toList(),
+                dosDecimales(totalExtras), dosDecimales(descuento), dosDecimales(total));
     }
 
     // 10 % de 300000 = 300000 * 10 / 100 = 30000.00

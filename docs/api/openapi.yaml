@@ -15,6 +15,8 @@ tags:
     \ (SCRUM-22)."
 - name: Servicios
   description: "Catálogo de servicios adicionales de un alojamiento (ej. WiFi, parqueadero)."
+- name: Servicios adicionales
+  description: Extras con precio que ofrece cada publicación (SCRUM-37).
 - name: Publicaciones
   description: Publicaciones de alojamientos del anfitrión (SCRUM-27).
 - name: Mi cuenta
@@ -83,12 +85,102 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/listings/{idPublicacion}/extras:
+    get:
+      tags:
+      - Servicios adicionales
+      summary: Listar los servicios adicionales activos de una publicación
+      operationId: listar
+      parameters:
+      - name: idPublicacion
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: Servicios adicionales activos
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServicioAdicionalResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La publicación no existe
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+    put:
+      tags:
+      - Servicios adicionales
+      summary: Reemplazar los servicios adicionales de una publicación
+      description: Solo el ANFITRION dueño. Los que no vengan en la lista quedan inactivos.
+      operationId: guardar
+      parameters:
+      - name: idPublicacion
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuardarServiciosAdicionalesRequest"
+        required: true
+      responses:
+        "200":
+          description: Servicios adicionales activos después del cambio
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServicioAdicionalResponse"
+        "400":
+          description: "Nombre vacío, precio negativo o nombre repetido"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: No es ANFITRION o la publicación es de otro anfitrión
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La publicación no existe
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/servicios:
     get:
       tags:
       - Servicios
       summary: Listar todos los servicios disponibles
-      operationId: listar
+      operationId: listar_1
       responses:
         "200":
           description: Lista de servicios
@@ -556,6 +648,44 @@ components:
             type: string
         token:
           type: string
+    GuardarServiciosAdicionalesRequest:
+      type: object
+      properties:
+        servicios:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServicioAdicionalRequest"
+      required:
+      - servicios
+    ServicioAdicionalRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          maxLength: 100
+          minLength: 0
+        descripcion:
+          type: string
+        precio:
+          type: number
+          minimum: 0
+      required:
+      - nombre
+      - precio
+    ServicioAdicionalResponse:
+      type: object
+      properties:
+        idServicioAdicional:
+          type: integer
+          format: int32
+        nombre:
+          type: string
+        descripcion:
+          type:
+          - string
+          - "null"
+        precio:
+          type: number
     CrearServicioRequest:
       type: object
       properties:
@@ -594,6 +724,11 @@ components:
           type: integer
           format: int32
           minimum: 1
+        idsServiciosAdicionales:
+          type: array
+          items:
+            type: integer
+            format: int32
       required:
       - fechaLlegada
       - fechaSalida
@@ -624,6 +759,12 @@ components:
         tarifaLimpieza:
           type: number
         tarifaServicio:
+          type: number
+        serviciosAdicionales:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServicioAdicionalResponse"
+        totalServiciosAdicionales:
           type: number
         descuento:
           type: number
