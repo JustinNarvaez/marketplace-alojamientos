@@ -21,6 +21,12 @@ public interface ReservaRepository extends JpaRepository<Reserva, Integer> {
             Integer idAlojamiento, Collection<EstadoReserva> estados,
             LocalDate salida, LocalDate llegada);
 
+    // SCRUM-33, escenario 4: igual que la de arriba pero sin contar una reserva
+    // (la que se cancela), para saber si otra sigue ocupando esas fechas.
+    boolean existsByAlojamiento_IdAlojamientoAndIdReservaNotAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
+            Integer idAlojamiento, Integer idReservaExcluida, Collection<EstadoReserva> estados,
+            LocalDate salida, LocalDate llegada);
+
     // SCRUM-53, reporte de demanda: solo las reservas que si se concretaron.
     List<Reserva> findByEstadoIn(Collection<EstadoReserva> estados);
 }

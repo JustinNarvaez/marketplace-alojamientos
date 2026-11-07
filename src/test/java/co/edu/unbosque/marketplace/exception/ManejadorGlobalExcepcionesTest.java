@@ -3,6 +3,7 @@ package co.edu.unbosque.marketplace.exception;
 import co.edu.unbosque.marketplace.config.FiltroIdPeticion;
 import co.edu.unbosque.marketplace.dto.ErrorResponse;
 import co.edu.unbosque.marketplace.model.enums.EstadoCuenta;
+import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
@@ -161,6 +162,16 @@ class ManejadorGlobalExcepcionesTest {
 
         assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
         assertEquals("El alojamiento no está disponible en esas fechas. Prueba con otras.", respuesta.getBody().mensaje());
+    }
+
+    // SCRUM-33: por ejemplo, aprobar dos veces la misma reserva.
+    @Test
+    void reservaNoConfirmableResponde409() {
+        ResponseEntity<ErrorResponse> respuesta =
+                manejador.manejar(new ReservaNoConfirmableException(EstadoReserva.CONFIRMADA));
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals("Esta reserva ya no se puede confirmar: está confirmada.", respuesta.getBody().mensaje());
     }
 
     @Test

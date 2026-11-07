@@ -6,19 +6,24 @@ import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
 import co.edu.unbosque.marketplace.exception.DisponibilidadInvalidaException;
 import co.edu.unbosque.marketplace.exception.DisponibilidadNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.NoEsPropietarioException;
+import co.edu.unbosque.marketplace.exception.PeriodoNoDisponibleException;
 import co.edu.unbosque.marketplace.exception.PeriodoSuperpuestoException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.model.Alojamiento;
 import co.edu.unbosque.marketplace.model.Disponibilidad;
 import co.edu.unbosque.marketplace.model.Publicacion;
+import co.edu.unbosque.marketplace.model.Reserva;
 import co.edu.unbosque.marketplace.model.Usuario;
 import co.edu.unbosque.marketplace.model.enums.EstadoDisponibilidad;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
+import co.edu.unbosque.marketplace.repository.AlojamientoRepository;
 import co.edu.unbosque.marketplace.repository.DisponibilidadRepository;
 import co.edu.unbosque.marketplace.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.repository.ReservaRepository;
 import co.edu.unbosque.marketplace.repository.UsuarioRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -28,7 +33,8 @@ import java.util.List;
  * SCRUM-31: el anfitrion administra el calendario de su alojamiento.
  * Calendario abierto: todo se puede reservar salvo lo BLOQUEADO o RESERVADO.
  * El anfitrion maneja DISPONIBLE y BLOQUEADO; RESERVADO lo pone el sistema
- * al reservar (SCRUM-33) y por eso no se toca a mano.
+ * al confirmar una reserva y lo quita al cancelarla (SCRUM-33), por eso no
+ * se toca a mano.
  */
 @Service
 public class DisponibilidadService {
@@ -41,19 +47,114 @@ public class DisponibilidadService {
     static final List<EstadoReserva> RESERVAS_ACTIVAS =
             List.of(EstadoReserva.CONFIRMADA, EstadoReserva.PENDIENTE_APROBACION);
 
+    // SCRUM-33: lo que impide confirmar una reserva. Una PENDIENTE de otro
+    // huesped no lo impide: la primera que se confirma se queda con las fechas
+    // y la otra fallara cuando intenten confirmarla.
+    static final List<EstadoDisponibilidad> PERIODOS_OCUPADOS =
+            List.of(EstadoDisponibilidad.RESERVADO, EstadoDisponibilidad.BLOQUEADO);
+    static final List<EstadoReserva> RESERVAS_CONFIRMADAS = List.of(EstadoReserva.CONFIRMADA);
+
+    // Restriccion EXCLUDE de V1: dos reservas CONFIRMADAS del mismo alojamiento no se cruzan.
+    static final String RESTRICCION_SIN_SOLAPAMIENTO = "ex_reserva_sin_solapamiento";
+
     private final DisponibilidadRepository disponibilidadRepository;
     private final PublicacionRepository publicacionRepository;
     private final UsuarioRepository usuarioRepository;
     private final ReservaRepository reservaRepository;
+    private final AlojamientoRepository alojamientoRepository;
 
     public DisponibilidadService(DisponibilidadRepository disponibilidadRepository,
                                  PublicacionRepository publicacionRepository,
                                  UsuarioRepository usuarioRepository,
-                                 ReservaRepository reservaRepository) {
+                                 ReservaRepository reservaRepository,
+                                 AlojamientoRepository alojamientoRepository) {
         this.disponibilidadRepository = disponibilidadRepository;
         this.publicacionRepository = publicacionRepository;
         this.usuarioRepository = usuarioRepository;
         this.reservaRepository = reservaRepository;
+        this.alojamientoRepository = alojamientoRepository;
+    }
+
+    /**
+     * SCRUM-33, escenarios 1 a 3. Confirma una reserva PENDIENTE_APROBACION y
+     * bloquea su periodo llegada-salida como RESERVADO. Lo llama quien confirma
+     * (reserva inmediata SCRUM-38, aprobacion SCRUM-41, pago SCRUM-55) dentro de
+     * su propia transaccion: si algo falla despues, el bloqueo tambien se deshace.
+     *
+     * <ol>
+     *   <li>Exige que la reserva este PENDIENTE_APROBACION (si no, 409).</li>
+     *   <li>Bloquea la fila del alojamiento: dos confirmaciones simultaneas del
+     *       mismo alojamiento se atienden una detras de otra (escenario 3).</li>
+     *   <li>Vuelve a verificar las fechas al confirmar, no solo al cotizar
+     *       (escenario 2): ni periodos BLOQUEADO/RESERVADO ni otra reserva CONFIRMADA.</li>
+     *   <li>Confirma la reserva y crea el periodo RESERVADO (escenario 1).</li>
+     * </ol>
+     * Si aun asi la base rechaza la reserva por la restriccion EXCLUDE, se
+     * responde lo mismo que en el paso 2 (409), nunca un error 500.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void confirmarReservaYBloquear(Reserva reserva) {
+        reserva.validarQueSePuedeConfirmar();
+        Alojamiento alojamiento = alojamientoRepository
+                .bloquearParaReservar(reserva.getAlojamiento().getIdAlojamiento())
+                .orElseThrow();
+        Integer idAlojamiento = alojamiento.getIdAlojamiento();
+        LocalDate llegada = reserva.getFechaLlegada();
+        LocalDate salida = reserva.getFechaSalida();
+
+        boolean calendarioOcupado = disponibilidadRepository
+                .existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
+                        idAlojamiento, PERIODOS_OCUPADOS, salida, llegada);
+        boolean otraConfirmada = reservaRepository
+                .existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
+                        idAlojamiento, RESERVAS_CONFIRMADAS, salida, llegada);
+        if (calendarioOcupado || otraConfirmada) {
+            throw new PeriodoNoDisponibleException();
+        }
+
+        reserva.confirmar();
+        try {
+            reservaRepository.saveAndFlush(reserva);
+        } catch (DataIntegrityViolationException ex) {
+            if (violaSinSolapamiento(ex)) {
+                throw new PeriodoNoDisponibleException();
+            }
+            throw ex;
+        }
+        disponibilidadRepository.save(new Disponibilidad(alojamiento, llegada, salida,
+                EstadoDisponibilidad.RESERVADO));
+    }
+
+    /**
+     * SCRUM-33, escenario 4. Lo llama la cancelacion (SCRUM-43) despues de
+     * pasar la reserva a CANCELADA, en su misma transaccion. Quita el periodo
+     * RESERVADO: con el calendario abierto, esas fechas vuelven a estar
+     * disponibles. Si otra reserva CONFIRMADA ocupa esas mismas fechas (la
+     * cancelada nunca se llego a confirmar), el periodo es de esa otra y se deja.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void liberarPeriodoDeReserva(Reserva reserva) {
+        if (reserva.getEstado() != EstadoReserva.CANCELADA) {
+            throw new IllegalStateException("Solo se libera el periodo de una reserva CANCELADA.");
+        }
+        Integer idAlojamiento = reserva.getAlojamiento().getIdAlojamiento();
+        LocalDate llegada = reserva.getFechaLlegada();
+        LocalDate salida = reserva.getFechaSalida();
+
+        boolean otraLasOcupa = reservaRepository
+                .existsByAlojamiento_IdAlojamientoAndIdReservaNotAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
+                        idAlojamiento, reserva.getIdReserva(), RESERVAS_CONFIRMADAS, salida, llegada);
+        if (otraLasOcupa) {
+            return;
+        }
+        disponibilidadRepository.deleteAll(disponibilidadRepository
+                .findByAlojamiento_IdAlojamientoAndEstadoAndFechaInicioAndFechaFin(
+                        idAlojamiento, EstadoDisponibilidad.RESERVADO, llegada, salida));
+    }
+
+    private static boolean violaSinSolapamiento(DataIntegrityViolationException ex) {
+        String detalle = ex.getMostSpecificCause().getMessage();
+        return detalle != null && detalle.contains(RESTRICCION_SIN_SOLAPAMIENTO);
     }
 
     @Transactional(readOnly = true)

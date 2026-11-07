@@ -25,4 +25,9 @@ public interface DisponibilidadRepository extends JpaRepository<Disponibilidad, 
     boolean existsByAlojamiento_IdAlojamientoAndIdDisponibilidadNotAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
             Integer idAlojamiento, Integer idExcluido, Collection<EstadoDisponibilidad> estados,
             LocalDate fin, LocalDate inicio);
+
+    // SCRUM-33, escenario 4: el periodo que se bloqueo para una reserva tiene
+    // exactamente sus fechas (fecha_inicio = llegada, fecha_fin = salida).
+    List<Disponibilidad> findByAlojamiento_IdAlojamientoAndEstadoAndFechaInicioAndFechaFin(
+            Integer idAlojamiento, EstadoDisponibilidad estado, LocalDate fechaInicio, LocalDate fechaFin);
 }
