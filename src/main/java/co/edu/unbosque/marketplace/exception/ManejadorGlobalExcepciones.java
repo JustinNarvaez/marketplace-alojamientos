@@ -59,6 +59,16 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(NoEsPropietarioException.class)
+    public ResponseEntity<ErrorResponse> manejar(NoEsPropietarioException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(ServicioAdicionalDuplicadoException.class)
+    public ResponseEntity<ErrorResponse> manejar(ServicioAdicionalDuplicadoException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(CorreoYaRegistradoException.class)
     public ResponseEntity<ErrorResponse> manejar(CorreoYaRegistradoException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));

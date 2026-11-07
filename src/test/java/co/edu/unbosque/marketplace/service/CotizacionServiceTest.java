@@ -7,11 +7,13 @@ import co.edu.unbosque.marketplace.exception.PeriodoNoDisponibleException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.model.Alojamiento;
 import co.edu.unbosque.marketplace.model.Publicacion;
+import co.edu.unbosque.marketplace.model.ServicioAdicional;
 import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
 import co.edu.unbosque.marketplace.model.enums.TipoAlojamiento;
 import co.edu.unbosque.marketplace.repository.DisponibilidadRepository;
 import co.edu.unbosque.marketplace.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.repository.ReservaRepository;
+import co.edu.unbosque.marketplace.repository.ServicioAdicionalRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,7 +23,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -45,13 +49,15 @@ class CotizacionServiceTest {
     private DisponibilidadRepository disponibilidadRepository;
     @Mock
     private ReservaRepository reservaRepository;
+    @Mock
+    private ServicioAdicionalRepository servicioAdicionalRepository;
 
     private CotizacionService cotizacionService;
 
     @BeforeEach
     void preparar() {
         cotizacionService = new CotizacionService(publicacionRepository, disponibilidadRepository,
-                reservaRepository, BigDecimal.TEN, BigDecimal.TEN, 7);
+                reservaRepository, servicioAdicionalRepository, BigDecimal.TEN, BigDecimal.TEN, 7);
     }
 
     private Publicacion unaPublicacion(EstadoPublicacion estado) {
@@ -74,7 +80,7 @@ class CotizacionServiceTest {
     }
 
     private CotizacionRequest solicitud(int noches, int huespedes) {
-        return new CotizacionRequest(1, LLEGADA, LLEGADA.plusDays(noches), (short) huespedes);
+        return new CotizacionRequest(1, LLEGADA, LLEGADA.plusDays(noches), (short) huespedes, null);
     }
 
     // Compara el valor sin importar la escala (300000 == 300000.00).
@@ -124,7 +130,7 @@ class CotizacionServiceTest {
     @Test
     void escenario2_usaLosPorcentajesConfigurados() {
         cotizacionService = new CotizacionService(publicacionRepository, disponibilidadRepository,
-                reservaRepository, new BigDecimal("15"), new BigDecimal("20"), 3);
+                reservaRepository, servicioAdicionalRepository, new BigDecimal("15"), new BigDecimal("20"), 3);
         publicacionActivaYLibre();
 
         CotizacionResponse cotizacion = cotizacionService.cotizar(solicitud(3, 2));
@@ -137,7 +143,7 @@ class CotizacionServiceTest {
 
     @Test
     void escenario3_salidaIgualALaLlegadaSeRechaza() {
-        CotizacionRequest mismoDia = new CotizacionRequest(1, LLEGADA, LLEGADA, (short) 2);
+        CotizacionRequest mismoDia = new CotizacionRequest(1, LLEGADA, LLEGADA, (short) 2, null);
 
         assertThrows(CotizacionInvalidaException.class, () -> cotizacionService.cotizar(mismoDia));
     }
@@ -185,5 +191,64 @@ class CotizacionServiceTest {
         when(publicacionRepository.findById(1)).thenReturn(Optional.empty());
 
         assertThrows(PublicacionNoEncontradaException.class, () -> cotizacionService.cotizar(solicitud(3, 2)));
+    }
+
+    // ===== SCRUM-37: servicios adicionales =====
+
+    private ServicioAdicional unExtra(int id, String nombre, String precio) {
+        ServicioAdicional extra = new ServicioAdicional(null, nombre, null, new BigDecimal(precio), true);
+        extra.setIdServicioAdicional(id);
+        return extra;
+    }
+
+    @Test
+    void scrum37_escenario1_losExtrasSeSumanAlTotalYSeDesglosan() {
+        publicacionActivaYLibre();
+        when(servicioAdicionalRepository.findByPublicacion_IdPublicacionAndActivoTrueAndIdServicioAdicionalIn(
+                1, Set.of(5, 6))).thenReturn(List.of(unExtra(5, "Desayuno", "20000"), unExtra(6, "Parqueadero", "15000")));
+
+        CotizacionResponse cotizacion = cotizacionService.cotizar(
+                new CotizacionRequest(1, LLEGADA, LLEGADA.plusDays(3), (short) 2, List.of(5, 6)));
+
+        assertEquals(2, cotizacion.serviciosAdicionales().size());
+        assertMonto("35000", cotizacion.totalServiciosAdicionales());
+        // 300000 + 50000 + 30000 + 35000 - 0
+        assertMonto("415000", cotizacion.total());
+    }
+
+    @Test
+    void scrum37_escenario2_sinExtrasElTotalNoCambia() {
+        publicacionActivaYLibre();
+
+        CotizacionResponse cotizacion = cotizacionService.cotizar(
+                new CotizacionRequest(1, LLEGADA, LLEGADA.plusDays(3), (short) 2, List.of()));
+
+        assertEquals(List.of(), cotizacion.serviciosAdicionales());
+        assertMonto("0", cotizacion.totalServiciosAdicionales());
+        assertMonto("380000", cotizacion.total());
+    }
+
+    @Test
+    void scrum37_escenario3_usaElPrecioVigenteDelExtra() {
+        publicacionActivaYLibre();
+        // El anfitrion subio el desayuno a 25000: la cotizacion lee el valor actual.
+        when(servicioAdicionalRepository.findByPublicacion_IdPublicacionAndActivoTrueAndIdServicioAdicionalIn(
+                1, Set.of(5))).thenReturn(List.of(unExtra(5, "Desayuno", "25000")));
+
+        CotizacionResponse cotizacion = cotizacionService.cotizar(
+                new CotizacionRequest(1, LLEGADA, LLEGADA.plusDays(3), (short) 2, List.of(5)));
+
+        assertMonto("25000", cotizacion.totalServiciosAdicionales());
+        assertMonto("405000", cotizacion.total());
+    }
+
+    @Test
+    void scrum37_unExtraDeOtraPublicacionOInactivoSeRechaza() {
+        publicacionActivaYLibre();
+        when(servicioAdicionalRepository.findByPublicacion_IdPublicacionAndActivoTrueAndIdServicioAdicionalIn(
+                1, Set.of(5, 99))).thenReturn(List.of(unExtra(5, "Desayuno", "20000")));
+
+        assertThrows(CotizacionInvalidaException.class, () -> cotizacionService.cotizar(
+                new CotizacionRequest(1, LLEGADA, LLEGADA.plusDays(3), (short) 2, List.of(5, 99))));
     }
 }
