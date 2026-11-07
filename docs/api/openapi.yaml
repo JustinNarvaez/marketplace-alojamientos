@@ -800,6 +800,67 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/listings/{id}/status:
+    patch:
+      tags:
+      - Publicaciones
+      summary: Activar o pausar una publicación
+      description: Solo el ANFITRION dueño. Activar exige al menos una imagen; pausar
+        exige que esté ACTIVA.
+      operationId: cambiarEstado_1
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CambiarEstadoPublicacionRequest"
+        required: true
+      responses:
+        "200":
+          description: Estado actualizado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/EstadoPublicacionResponse"
+        "400":
+          description: Faltan datos mínimos para activarla (p. ej. ninguna imagen)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: No es el dueño de la publicación
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La publicación no existe
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "La publicación está BLOQUEADA, o se intenta pausar una que\
+            \ no está ACTIVA"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/listings/mine:
     get:
       tags:
@@ -1527,6 +1588,20 @@ components:
       type: object
       properties:
         estadoCuenta:
+          type: string
+    CambiarEstadoPublicacionRequest:
+      type: object
+      properties:
+        estado:
+          type: string
+          minLength: 1
+          pattern: ACTIVA|PAUSADA
+      required:
+      - estado
+    EstadoPublicacionResponse:
+      type: object
+      properties:
+        estado:
           type: string
     PerfilUsuarioResponse:
       type: object

@@ -35,6 +35,8 @@ export default function DetallePublicacion() {
     const navegar = useNavigate()
     const [publicacion, setPublicacion] = useState<PublicacionDetalle | null>(null)
     const [error, setError] = useState<string | null>(null)
+    const [errorEstado, setErrorEstado] = useState<string | null>(null)
+    const [cambiandoEstado, setCambiandoEstado] = useState(false)
 
     useEffect(() => {
         pedir<PublicacionDetalle>(`/listings/mine/${id}`)
@@ -45,6 +47,25 @@ export default function DetallePublicacion() {
                 setError(err instanceof ErrorApi ? err.message : 'No pudimos cargar la publicación.')
             })
     }, [id])
+
+    // SCRUM-29: activar exige al menos una imagen (400) y no permite una
+    // BLOQUEADA (409); pausar exige que este ACTIVA (409). El mensaje de
+    // cada caso lo manda el backend, aqui solo se muestra.
+    const cambiarEstado = async (nuevoEstado: 'ACTIVA' | 'PAUSADA') => {
+        setErrorEstado(null)
+        setCambiandoEstado(true)
+        try {
+            const respuesta = await pedir<{ estado: string }>(`/listings/${id}/status`, {
+                method: 'PATCH',
+                body: JSON.stringify({ estado: nuevoEstado }),
+            })
+            setPublicacion((actual) => (actual ? { ...actual, estado: respuesta.estado } : actual))
+        } catch (err) {
+            setErrorEstado(err instanceof ErrorApi ? err.message : 'No pudimos cambiar el estado.')
+        } finally {
+            setCambiandoEstado(false)
+        }
+    }
 
     if (error) {
         return <Alert severity="error" sx={{ maxWidth: 720, mx: 'auto' }}>{error}</Alert>
@@ -60,9 +81,20 @@ export default function DetallePublicacion() {
                 <Typography variant="h5">{publicacion.titulo}</Typography>
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                     <Chip label={publicacion.estado} color={publicacion.estado === 'ACTIVA' ? 'success' : 'default'} />
+                    {publicacion.estado === 'ACTIVA' && (
+                        <Button size="small" disabled={cambiandoEstado} onClick={() => void cambiarEstado('PAUSADA')}>
+                            Pausar
+                        </Button>
+                    )}
+                    {publicacion.estado !== 'ACTIVA' && publicacion.estado !== 'BLOQUEADA' && (
+                        <Button size="small" disabled={cambiandoEstado} onClick={() => void cambiarEstado('ACTIVA')}>
+                            Activar
+                        </Button>
+                    )}
                     <Button size="small" onClick={() => navegar(`/mis-publicaciones/${id}/editar`)}>Editar</Button>
                 </Stack>
             </Stack>
+            {errorEstado && <Alert severity="error" sx={{ mb: 2 }}>{errorEstado}</Alert>}
             <Typography color="text.secondary" sx={{ mb: 2 }}>
                 {publicacion.ciudad} · {publicacion.direccion}
                 {publicacion.ubicacion && ` · ${publicacion.ubicacion}`}

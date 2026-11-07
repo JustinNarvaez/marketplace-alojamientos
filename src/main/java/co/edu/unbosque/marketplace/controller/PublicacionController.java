@@ -1,11 +1,14 @@
 package co.edu.unbosque.marketplace.controller;
 
+import co.edu.unbosque.marketplace.dto.CambiarEstadoPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.DetalleAlojamientoResponse;
 import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.ErrorResponse;
+import co.edu.unbosque.marketplace.dto.EstadoPublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
+import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
 import co.edu.unbosque.marketplace.service.PublicacionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -19,6 +22,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -124,5 +128,29 @@ public class PublicacionController {
     @GetMapping("/{id}")
     public DetalleAlojamientoResponse obtenerParaHuesped(@PathVariable Integer id) {
         return publicacionService.obtenerParaHuesped(id);
+    }
+
+    // Solo el ANFITRION dueño; esta historia no menciona ADMINISTRADOR.
+    @Operation(summary = "Activar o pausar una publicación",
+            description = "Solo el ANFITRION dueño. Activar exige al menos una imagen; pausar exige que esté ACTIVA.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Estado actualizado"),
+            @ApiResponse(responseCode = "400", description = "Faltan datos mínimos para activarla (p. ej. ninguna imagen)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Falta el token o ya venció",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "No es el dueño de la publicación",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "La publicación no existe",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "La publicación está BLOQUEADA, o se intenta pausar una que no está ACTIVA",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    })
+    @PatchMapping("/{id}/status")
+    public EstadoPublicacionResponse cambiarEstado(@PathVariable Integer id,
+                                                    @Valid @RequestBody CambiarEstadoPublicacionRequest request,
+                                                    Principal principal, HttpServletRequest httpRequest) {
+        return publicacionService.cambiarEstado(principal.getName(), id,
+                EstadoPublicacion.valueOf(request.estado()), httpRequest.getRemoteAddr());
     }
 }

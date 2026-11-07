@@ -5,11 +5,14 @@ import co.edu.unbosque.marketplace.dto.ResumenResenasResponse;
 import co.edu.unbosque.marketplace.dto.DetalleAlojamientoResponse;
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
+import co.edu.unbosque.marketplace.dto.EstadoPublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
 import co.edu.unbosque.marketplace.exception.NoEsPropietarioException;
 import co.edu.unbosque.marketplace.exception.PublicacionBloqueadaException;
+import co.edu.unbosque.marketplace.exception.PublicacionIncompletaException;
+import co.edu.unbosque.marketplace.exception.PublicacionNoActivaException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.ServicioNoEncontradoException;
 import co.edu.unbosque.marketplace.model.Alojamiento;
@@ -489,5 +492,104 @@ class PublicacionServiceTest {
         when(publicacionRepository.findById(99)).thenReturn(Optional.empty());
 
         assertThrows(PublicacionNoEncontradaException.class, () -> publicacionService.obtenerParaHuesped(99));
+    }
+
+    @Test
+    void cambiarEstadoEscenario1_activaConAlMenosUnaImagenYQuedaAuditada() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        publicacion.setEstado(EstadoPublicacion.BORRADOR);
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(imagenRepository.findByPublicacion_IdPublicacionOrderByOrdenAsc(1))
+                .thenReturn(List.of(new Imagen(publicacion, "portada.jpg", (short) 1, true)));
+        when(publicacionRepository.save(any(Publicacion.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        EstadoPublicacionResponse respuesta = publicacionService.cambiarEstado(
+                "ana@ejemplo.com", 1, EstadoPublicacion.ACTIVA, "127.0.0.1");
+
+        assertEquals("ACTIVA", respuesta.estado());
+        verify(servicioAuditoria).registrarEnTransaccionActual(usuario, TipoEventoAuditoria.PUBLICACION,
+                "publicacion", 1, "ACTIVACION_PUBLICACION", ResultadoAuditoria.EXITO, "127.0.0.1");
+    }
+
+    @Test
+    void cambiarEstadoEscenario2_sinImagenesNoSePuedeActivar() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        publicacion.setEstado(EstadoPublicacion.BORRADOR);
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(imagenRepository.findByPublicacion_IdPublicacionOrderByOrdenAsc(1)).thenReturn(List.of());
+
+        assertThrows(PublicacionIncompletaException.class, () -> publicacionService.cambiarEstado(
+                "ana@ejemplo.com", 1, EstadoPublicacion.ACTIVA, "127.0.0.1"));
+
+        verify(publicacionRepository, never()).save(any());
+    }
+
+    @Test
+    void cambiarEstadoEscenario3_pausaUnaActivaYQuedaAuditada() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(publicacionRepository.save(any(Publicacion.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        EstadoPublicacionResponse respuesta = publicacionService.cambiarEstado(
+                "ana@ejemplo.com", 1, EstadoPublicacion.PAUSADA, "127.0.0.1");
+
+        assertEquals("PAUSADA", respuesta.estado());
+        verify(servicioAuditoria).registrarEnTransaccionActual(usuario, TipoEventoAuditoria.PUBLICACION,
+                "publicacion", 1, "PAUSA_PUBLICACION", ResultadoAuditoria.EXITO, "127.0.0.1");
+    }
+
+    @Test
+    void cambiarEstadoEscenario4_noSePuedeActivarUnaBloqueada() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        publicacion.setEstado(EstadoPublicacion.BLOQUEADA);
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(imagenRepository.findByPublicacion_IdPublicacionOrderByOrdenAsc(1))
+                .thenReturn(List.of(new Imagen(publicacion, "portada.jpg", (short) 1, true)));
+
+        assertThrows(PublicacionBloqueadaException.class, () -> publicacionService.cambiarEstado(
+                "ana@ejemplo.com", 1, EstadoPublicacion.ACTIVA, "127.0.0.1"));
+
+        verify(publicacionRepository, never()).save(any());
+    }
+
+    @Test
+    void cambiarEstadoNoSePuedePausarUnaQueNoEstaActiva() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        publicacion.setEstado(EstadoPublicacion.BORRADOR);
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+
+        assertThrows(PublicacionNoActivaException.class, () -> publicacionService.cambiarEstado(
+                "ana@ejemplo.com", 1, EstadoPublicacion.PAUSADA, "127.0.0.1"));
+
+        verify(publicacionRepository, never()).save(any());
+    }
+
+    @Test
+    void cambiarEstadoSiNoEsElDuenoLanza403() {
+        Usuario otraAnfitriona = new Usuario("Laura", "Diaz", "laura@ejemplo.com", "hash", "3000000000",
+                OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        otraAnfitriona.setIdUsuario(55);
+        when(usuarioRepository.findByEmail("laura@ejemplo.com")).thenReturn(Optional.of(otraAnfitriona));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+
+        assertThrows(NoEsPropietarioException.class, () -> publicacionService.cambiarEstado(
+                "laura@ejemplo.com", 1, EstadoPublicacion.PAUSADA, "127.0.0.1"));
+
+        verify(publicacionRepository, never()).save(any());
+    }
+
+    @Test
+    void cambiarEstadoSiLaPublicacionNoExisteResponde404() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        when(publicacionRepository.findById(1)).thenReturn(Optional.empty());
+
+        assertThrows(PublicacionNoEncontradaException.class, () -> publicacionService.cambiarEstado(
+                "ana@ejemplo.com", 1, EstadoPublicacion.ACTIVA, "127.0.0.1"));
     }
 }

@@ -60,6 +60,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/servicios").hasRole("ADMINISTRADOR")
                         .requestMatchers(HttpMethod.POST, "/api/listings").hasRole("ANFITRION")
                         .requestMatchers(HttpMethod.PUT, "/api/listings/*/extras").hasRole("ANFITRION")
+                        // SCRUM-29: solo el dueno activa/pausa, sin bypass de admin.
+                        .requestMatchers(HttpMethod.PATCH, "/api/listings/*/status").hasRole("ANFITRION")
                         // SCRUM-28: el dueño o un ADMINISTRADOR pueden editar (la
                         // pertenencia y el estado BLOQUEADA se resuelven en el servicio).
                         .requestMatchers(HttpMethod.PUT, "/api/listings/*").hasAnyRole("ANFITRION", "ADMINISTRADOR")

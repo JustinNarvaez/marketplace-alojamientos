@@ -3,12 +3,14 @@ package co.edu.unbosque.marketplace.service;
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.DetalleAlojamientoResponse;
 import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
+import co.edu.unbosque.marketplace.dto.EstadoPublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
 import co.edu.unbosque.marketplace.dto.ServicioResponse;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
 import co.edu.unbosque.marketplace.exception.NoEsPropietarioException;
 import co.edu.unbosque.marketplace.exception.PublicacionBloqueadaException;
+import co.edu.unbosque.marketplace.exception.PublicacionIncompletaException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoDisponibleException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.ServicioNoEncontradoException;
@@ -231,6 +233,44 @@ public class PublicacionService {
                 ResultadoAuditoria.EXITO, ipOrigen);
 
         return aResponse(publicacion, reglas, imagenes);
+    }
+
+    /**
+     * SCRUM-29. Sin bypass de admin: a diferencia de editar(), esta historia
+     * no menciona ADMINISTRADOR, solo al ANFITRION dueno.
+     */
+    @Transactional
+    public EstadoPublicacionResponse cambiarEstado(String correo, Integer idPublicacion,
+                                                    EstadoPublicacion nuevoEstado, String ipOrigen) {
+        Usuario usuario = usuarioRepository.findByEmail(correo)
+                .orElseThrow(CredencialesInvalidasException::new);
+        Publicacion publicacion = publicacionRepository.findById(idPublicacion)
+                .orElseThrow(PublicacionNoEncontradaException::new);
+
+        Integer idDueno = publicacion.getAlojamiento().getAnfitrion().getUsuario().getIdUsuario();
+        if (!idDueno.equals(usuario.getIdUsuario())) {
+            throw new NoEsPropietarioException();
+        }
+
+        String accion;
+        if (nuevoEstado == EstadoPublicacion.ACTIVA) {
+            boolean sinImagenes = imagenRepository
+                    .findByPublicacion_IdPublicacionOrderByOrdenAsc(idPublicacion).isEmpty();
+            if (sinImagenes) {
+                throw new PublicacionIncompletaException();
+            }
+            publicacion.activar();
+            accion = "ACTIVACION_PUBLICACION";
+        } else {
+            publicacion.pausar();
+            accion = "PAUSA_PUBLICACION";
+        }
+        publicacionRepository.save(publicacion);
+
+        servicioAuditoria.registrarEnTransaccionActual(usuario, TipoEventoAuditoria.PUBLICACION,
+                "publicacion", idPublicacion, accion, ResultadoAuditoria.EXITO, ipOrigen);
+
+        return new EstadoPublicacionResponse(publicacion.getEstado().name());
     }
 
     // Si piden un id que no existe, findAllById devuelve menos servicios que ids.

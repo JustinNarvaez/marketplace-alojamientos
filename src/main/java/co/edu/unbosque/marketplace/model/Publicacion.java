@@ -1,5 +1,7 @@
 package co.edu.unbosque.marketplace.model;
 
+import co.edu.unbosque.marketplace.exception.PublicacionBloqueadaException;
+import co.edu.unbosque.marketplace.exception.PublicacionNoActivaException;
 import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
 import jakarta.persistence.*;
 
@@ -63,6 +65,30 @@ public class Publicacion {
     }
 
     protected Publicacion(){}
+
+    /**
+     * SCRUM-29, escenario 4. La informacion minima (al menos una imagen,
+     * escenario 2) se valida en el servicio: ahi es donde se consulta
+     * ImagenRepository, la entidad no tiene esa coleccion mapeada.
+     */
+    public void activar() {
+        if (estado == EstadoPublicacion.BLOQUEADA) {
+            throw new PublicacionBloqueadaException();
+        }
+        if (fechaPublicacion == null) {
+            fechaPublicacion = OffsetDateTime.now();
+        }
+        estado = EstadoPublicacion.ACTIVA;
+    }
+
+    // SCRUM-29, escenario 3. Cubre tambien una BLOQUEADA: nunca esta ACTIVA
+    // mientras lo este, asi que cae en el mismo caso sin chequeo aparte.
+    public void pausar() {
+        if (estado != EstadoPublicacion.ACTIVA) {
+            throw new PublicacionNoActivaException();
+        }
+        estado = EstadoPublicacion.PAUSADA;
+    }
 
     public Integer getIdPublicacion() {
         return idPublicacion;
