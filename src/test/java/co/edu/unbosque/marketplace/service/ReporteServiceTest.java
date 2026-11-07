@@ -88,9 +88,12 @@ class ReporteServiceTest {
 
     @Test
     void demandaAgrupaPorCiudadDeMayorAMenorYSoloCuentaReservasConcretadas() {
+        // Las reservas simuladas se crean antes del when(): Mockito no deja
+        // configurar un mock mientras otro when() esta a medio escribir.
+        List<Reserva> reservas = List.of(reserva("Bogota", 2, 3), reserva("Cartagena", 3, 2),
+                reserva("Cartagena", 4, 4));
         when(reservaRepository.findByEstadoIn(List.of(EstadoReserva.CONFIRMADA, EstadoReserva.COMPLETADA)))
-                .thenReturn(List.of(reserva("Bogota", 2, 3), reserva("Cartagena", 3, 2),
-                        reserva("Cartagena", 4, 4)));
+                .thenReturn(reservas);
 
         Reporte reporte = reporteService.generar(TipoReporte.DEMANDA);
 

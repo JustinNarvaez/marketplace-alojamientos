@@ -39,7 +39,7 @@ public class ExportadorPdf {
             documento.open();
             documento.add(new Paragraph(reporte.titulo(), FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16)));
             documento.add(new Paragraph("Generado: " + OffsetDateTime.now(ZONA).format(FORMATO_GENERADO)
-                    + " · " + reporte.filas().size() + " filas", FontFactory.getFont(FontFactory.HELVETICA, 9)));
+                    + " - " + reporte.filas().size() + " filas", FontFactory.getFont(FontFactory.HELVETICA, 9)));
             documento.add(tabla(reporte));
         } catch (DocumentException e) {
             throw new IllegalStateException("No se pudo generar el PDF del reporte " + reporte.titulo(), e);
@@ -56,8 +56,11 @@ public class ExportadorPdf {
         PdfPTable tabla = new PdfPTable(reporte.columnas().size());
         tabla.setWidthPercentage(100);
         tabla.setSpacingBefore(12);
-        // El encabezado se repite en cada pagina.
-        tabla.setHeaderRows(1);
+        // El encabezado se repite en cada pagina. Solo si hay filas: una tabla
+        // que es toda encabezado no se dibuja, y el escenario 3 pide verlo.
+        if (!reporte.filas().isEmpty()) {
+            tabla.setHeaderRows(1);
+        }
 
         for (String columna : reporte.columnas()) {
             PdfPCell celda = new PdfPCell(new Phrase(columna, negrita));
