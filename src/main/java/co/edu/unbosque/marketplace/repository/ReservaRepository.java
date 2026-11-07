@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.List;
 
 public interface ReservaRepository extends JpaRepository<Reserva, Integer> {
 
@@ -19,4 +20,7 @@ public interface ReservaRepository extends JpaRepository<Reserva, Integer> {
     boolean existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
             Integer idAlojamiento, Collection<EstadoReserva> estados,
             LocalDate salida, LocalDate llegada);
+
+    // SCRUM-53, reporte de demanda: solo las reservas que si se concretaron.
+    List<Reserva> findByEstadoIn(Collection<EstadoReserva> estados);
 }

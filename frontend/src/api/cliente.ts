@@ -46,7 +46,8 @@ async function mensajeDe(respuesta: Response): Promise<string> {
     return MENSAJES[respuesta.status] ?? 'Ocurrió un error. Intenta más tarde'
 }
 
-export async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
+// Arma la peticion (JSON, token), y traduce los errores a ErrorApi.
+async function enviar(ruta: string, opciones: RequestInit = {}): Promise<Response> {
 
     const encabezados = new Headers(opciones.headers)
     if(opciones.body && !encabezados.has('Content-Type')){
@@ -69,5 +70,24 @@ export async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promis
     if(!respuesta.ok){
         throw new ErrorApi(respuesta.status, await mensajeDe(respuesta))
     }
+    return respuesta
+}
+
+export async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
+    const respuesta = await enviar(ruta, opciones)
     return await respuesta.json() as T
+}
+
+export interface ArchivoDescargado {
+    contenido: Blob
+    nombre: string | null
+}
+
+// SCRUM-53: para endpoints que devuelven un archivo (PDF, Excel) en vez de JSON.
+// El nombre sale del encabezado Content-Disposition que pone el backend.
+export async function pedirArchivo(ruta: string): Promise<ArchivoDescargado> {
+    const respuesta = await enviar(ruta)
+    const disposicion = respuesta.headers.get('Content-Disposition') ?? ''
+    const coincidencia = /filename="?([^";]+)"?/.exec(disposicion)
+    return { contenido: await respuesta.blob(), nombre: coincidencia ? coincidencia[1] : null }
 }
