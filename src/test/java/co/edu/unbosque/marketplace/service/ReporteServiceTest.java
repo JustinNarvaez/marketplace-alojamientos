@@ -4,9 +4,13 @@ import co.edu.unbosque.marketplace.dto.Reporte;
 import co.edu.unbosque.marketplace.model.Alojamiento;
 import co.edu.unbosque.marketplace.model.Pago;
 import co.edu.unbosque.marketplace.model.Reserva;
+import co.edu.unbosque.marketplace.model.Usuario;
+import co.edu.unbosque.marketplace.model.enums.EstadoCuenta;
 import co.edu.unbosque.marketplace.model.enums.EstadoPago;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
 import co.edu.unbosque.marketplace.model.enums.FormatoReporte;
+import co.edu.unbosque.marketplace.model.enums.ResultadoAuditoria;
+import co.edu.unbosque.marketplace.model.enums.TipoEventoAuditoria;
 import co.edu.unbosque.marketplace.model.enums.TipoPago;
 import co.edu.unbosque.marketplace.model.enums.TipoReporte;
 import co.edu.unbosque.marketplace.repository.PagoRepository;
@@ -24,14 +28,17 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,13 +56,15 @@ class ReporteServiceTest {
     private ExportadorPdf exportadorPdf;
     @Mock
     private ExportadorExcel exportadorExcel;
+    @Mock
+    private ServicioAuditoria servicioAuditoria;
 
     private ReporteService reporteService;
 
     @BeforeEach
     void crearServicio() {
         reporteService = new ReporteService(usuarioRepository, publicacionRepository, reservaRepository,
-                pagoRepository, exportadorPdf, exportadorExcel);
+                pagoRepository, exportadorPdf, exportadorExcel, servicioAuditoria);
     }
 
     @Test
@@ -102,23 +111,57 @@ class ReporteServiceTest {
 
     @Test
     void exportarEnPdfUsaElExportadorPdf() {
+        Usuario admin = prepararAdmin();
         when(pagoRepository.findByEstadoOrderByFechaAsc(EstadoPago.EXITOSO)).thenReturn(List.of());
         byte[] pdf = {1};
         when(exportadorPdf.exportar(any())).thenReturn(pdf);
 
-        assertArrayEquals(pdf, reporteService.exportar(TipoReporte.INGRESOS, FormatoReporte.PDF));
+        assertArrayEquals(pdf, reporteService.exportar(TipoReporte.INGRESOS, FormatoReporte.PDF, CORREO_ADMIN, IP));
         verifyNoInteractions(exportadorExcel);
+        verify(servicioAuditoria).registrar(admin, TipoEventoAuditoria.EXPORTACION, "reporte", null,
+                "Exportar reporte ingresos (pdf)", ResultadoAuditoria.EXITO, IP);
     }
 
+    // SCRUM-54, escenario 1: queda registrado quien, que reporte, en que formato (y la fecha la pone el log).
     @Test
-    void exportarEnExcelUsaElExportadorExcel() {
+    void exportarEnExcelUsaElExportadorExcelYRegistraElExito() {
+        Usuario admin = prepararAdmin();
         when(pagoRepository.findByEstadoOrderByFechaAsc(EstadoPago.EXITOSO)).thenReturn(List.of());
         byte[] xlsx = {2};
         when(exportadorExcel.exportar(any())).thenReturn(xlsx);
 
-        assertArrayEquals(xlsx, reporteService.exportar(TipoReporte.INGRESOS, FormatoReporte.XLSX));
-        verify(exportadorExcel).exportar(any());
+        assertArrayEquals(xlsx, reporteService.exportar(TipoReporte.INGRESOS, FormatoReporte.XLSX, CORREO_ADMIN, IP));
         verifyNoInteractions(exportadorPdf);
+        verify(servicioAuditoria).registrar(admin, TipoEventoAuditoria.EXPORTACION, "reporte", null,
+                "Exportar reporte ingresos (xlsx)", ResultadoAuditoria.EXITO, IP);
+    }
+
+    // SCRUM-54, escenario 2: si falla, se registra el intento con FALLO y el error sigue su camino (500).
+    @Test
+    void siLaExportacionFallaRegistraElFalloYPropagaElError() {
+        Usuario admin = prepararAdmin();
+        when(pagoRepository.findByEstadoOrderByFechaAsc(EstadoPago.EXITOSO)).thenReturn(List.of());
+        IllegalStateException error = new IllegalStateException("No se pudo generar el PDF");
+        when(exportadorPdf.exportar(any())).thenThrow(error);
+
+        IllegalStateException lanzada = assertThrows(IllegalStateException.class,
+                () -> reporteService.exportar(TipoReporte.INGRESOS, FormatoReporte.PDF, CORREO_ADMIN, IP));
+
+        assertEquals(error, lanzada);
+        verify(servicioAuditoria).registrar(admin, TipoEventoAuditoria.EXPORTACION, "reporte", null,
+                "Exportar reporte ingresos (pdf)", ResultadoAuditoria.FALLO, IP);
+        // Y no se registra tambien un EXITO.
+        verifyNoMoreInteractions(servicioAuditoria);
+    }
+
+    private static final String CORREO_ADMIN = "admin@ejemplo.com";
+    private static final String IP = "127.0.0.1";
+
+    private Usuario prepararAdmin() {
+        Usuario admin = new Usuario("Ada", "Lovelace", CORREO_ADMIN, "hash", null,
+                OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        when(usuarioRepository.findByEmail(CORREO_ADMIN)).thenReturn(Optional.of(admin));
+        return admin;
     }
 
     // BigDecimal.equals compara tambien la escala (100000 != 100000.00): se usa compareTo.
