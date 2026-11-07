@@ -8,4 +8,6 @@ import java.util.List;
 public interface ReglaAlojamientoRepository extends JpaRepository<ReglaAlojamiento, Integer> {
 
     List<ReglaAlojamiento> findByPublicacion_IdPublicacionOrderByOrdenAsc(Integer idPublicacion);
+
+    void deleteByPublicacion_IdPublicacion(Integer idPublicacion);
 }

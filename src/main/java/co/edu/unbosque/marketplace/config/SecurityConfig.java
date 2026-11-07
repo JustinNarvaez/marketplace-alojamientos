@@ -60,6 +60,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/servicios").hasRole("ADMINISTRADOR")
                         .requestMatchers(HttpMethod.POST, "/api/listings").hasRole("ANFITRION")
                         .requestMatchers(HttpMethod.PUT, "/api/listings/*/extras").hasRole("ANFITRION")
+                        // SCRUM-28: el dueño o un ADMINISTRADOR pueden editar (la
+                        // pertenencia y el estado BLOQUEADA se resuelven en el servicio).
+                        .requestMatchers(HttpMethod.PUT, "/api/listings/*").hasAnyRole("ANFITRION", "ADMINISTRADOR")
                         .requestMatchers("/api/admin/**").hasRole("ADMINISTRADOR")
                         // SCRUM-30: solo el panel de gestion del anfitrion. GET /api/listings/{id}
                         // (sin /mine) es el detalle publico que consume el huesped (SCRUM-35).
