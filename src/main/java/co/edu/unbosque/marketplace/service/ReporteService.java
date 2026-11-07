@@ -1,6 +1,7 @@
 package co.edu.unbosque.marketplace.service;
 
 import co.edu.unbosque.marketplace.dto.Reporte;
+import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
 import co.edu.unbosque.marketplace.model.Pago;
 import co.edu.unbosque.marketplace.model.Publicacion;
 import co.edu.unbosque.marketplace.model.Reserva;
@@ -8,6 +9,8 @@ import co.edu.unbosque.marketplace.model.Usuario;
 import co.edu.unbosque.marketplace.model.enums.EstadoPago;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
 import co.edu.unbosque.marketplace.model.enums.FormatoReporte;
+import co.edu.unbosque.marketplace.model.enums.ResultadoAuditoria;
+import co.edu.unbosque.marketplace.model.enums.TipoEventoAuditoria;
 import co.edu.unbosque.marketplace.model.enums.TipoPago;
 import co.edu.unbosque.marketplace.model.enums.TipoReporte;
 import co.edu.unbosque.marketplace.repository.PagoRepository;
@@ -47,21 +50,44 @@ public class ReporteService {
     private final PagoRepository pagoRepository;
     private final ExportadorPdf exportadorPdf;
     private final ExportadorExcel exportadorExcel;
+    private final ServicioAuditoria servicioAuditoria;
 
     public ReporteService(UsuarioRepository usuarioRepository, PublicacionRepository publicacionRepository,
                           ReservaRepository reservaRepository, PagoRepository pagoRepository,
-                          ExportadorPdf exportadorPdf, ExportadorExcel exportadorExcel) {
+                          ExportadorPdf exportadorPdf, ExportadorExcel exportadorExcel,
+                          ServicioAuditoria servicioAuditoria) {
         this.usuarioRepository = usuarioRepository;
         this.publicacionRepository = publicacionRepository;
         this.reservaRepository = reservaRepository;
         this.pagoRepository = pagoRepository;
         this.exportadorPdf = exportadorPdf;
         this.exportadorExcel = exportadorExcel;
+        this.servicioAuditoria = servicioAuditoria;
     }
 
-    // Escenario 1: datos vigentes al momento de exportar (se consulta cada vez).
+    // SCRUM-54: cada exportacion queda en log_auditoria, salga bien o mal.
     @Transactional(readOnly = true)
-    public byte[] exportar(TipoReporte tipo, FormatoReporte formato) {
+    public byte[] exportar(TipoReporte tipo, FormatoReporte formato, String correo, String ipOrigen) {
+        Usuario solicitante = usuarioRepository.findByEmail(correo)
+                .orElseThrow(CredencialesInvalidasException::new);
+        String accion = "Exportar reporte " + tipo.getRuta() + " (" + formato.getExtension() + ")";
+
+        byte[] archivo;
+        try {
+            archivo = generarArchivo(tipo, formato);
+        } catch (RuntimeException e) {
+            servicioAuditoria.registrar(solicitante, TipoEventoAuditoria.EXPORTACION, "reporte", null,
+                    accion, ResultadoAuditoria.FALLO, ipOrigen);
+            throw e;
+        }
+
+        servicioAuditoria.registrar(solicitante, TipoEventoAuditoria.EXPORTACION, "reporte", null,
+                accion, ResultadoAuditoria.EXITO, ipOrigen);
+        return archivo;
+    }
+
+    // SCRUM-53, escenario 1: datos vigentes al momento de exportar (se consulta cada vez).
+    private byte[] generarArchivo(TipoReporte tipo, FormatoReporte formato) {
         Reporte reporte = generar(tipo);
         return switch (formato) {
             case PDF -> exportadorPdf.exportar(reporte);

@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.security.Principal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
@@ -61,11 +63,14 @@ public class ReporteController {
             @Parameter(description = "usuarios, publicaciones, reservas, ingresos o demanda")
             @PathVariable String tipo,
             @Parameter(description = "pdf o xlsx")
-            @RequestParam("format") String formato) {
+            @RequestParam("format") String formato,
+            Principal principal, HttpServletRequest httpRequest) {
         TipoReporte tipoReporte = TipoReporte.desde(tipo);
         FormatoReporte formatoReporte = FormatoReporte.desde(formato);
 
-        byte[] archivo = reporteService.exportar(tipoReporte, formatoReporte);
+        // SCRUM-54: quien lo pide y desde que IP queda registrado en log_auditoria.
+        byte[] archivo = reporteService.exportar(tipoReporte, formatoReporte,
+                principal.getName(), httpRequest.getRemoteAddr());
 
         String nombre = "reporte-" + tipoReporte.getRuta() + "-" + LocalDate.now(ZONA)
                 + "." + formatoReporte.getExtension();
