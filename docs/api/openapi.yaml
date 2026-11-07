@@ -15,10 +15,10 @@ tags:
     \ (SCRUM-22)."
 - name: Servicios
   description: "Catálogo de servicios adicionales de un alojamiento (ej. WiFi, parqueadero)."
-- name: Servicios adicionales
-  description: Extras con precio que ofrece cada publicación (SCRUM-37).
 - name: Publicaciones
   description: Publicaciones de alojamientos del anfitrión (SCRUM-27).
+- name: Servicios adicionales
+  description: Extras con precio que ofrece cada publicación (SCRUM-37).
 - name: Mi cuenta
   description: Perfil y estado de la cuenta del usuario autenticado (SCRUM-25/26).
 - name: Cotizaciones
@@ -524,6 +524,64 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/listings/mine:
+    get:
+      tags:
+      - Publicaciones
+      summary: Listar mis publicaciones
+      operationId: listarMias
+      responses:
+        "200":
+          description: Listado de publicaciones del anfitrión (vacío si no tiene ninguna)
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PublicacionResumenResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/listings/mine/{id}:
+    get:
+      tags:
+      - Publicaciones
+      summary: Ver el detalle de una publicación propia
+      operationId: obtenerDetalle
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: "Detalle completo: servicios, reglas, imágenes y política de\
+            \ cancelación"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PublicacionResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No existe o no es una publicación del anfitrión autenticado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/admin/audit-events:
     get:
       tags:
@@ -1018,6 +1076,20 @@ components:
           type: array
           items:
             type: string
+    PublicacionResumenResponse:
+      type: object
+      properties:
+        idPublicacion:
+          type: integer
+          format: int32
+        titulo:
+          type: string
+        ciudad:
+          type: string
+        precioNoche:
+          type: number
+        estado:
+          type: string
     EventoAuditoriaResponse:
       type: object
       properties:

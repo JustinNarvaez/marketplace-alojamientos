@@ -80,7 +80,7 @@ public class PublicacionController {
             @ApiResponse(responseCode = "404", description = "No existe o no es una publicación del anfitrión autenticado",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
     })
-    @GetMapping("/{id}")
+    @GetMapping("/mine/{id}")
     public PublicacionResponse obtenerDetalle(@PathVariable Integer id, Principal principal) {
         return publicacionService.obtenerDetalle(principal.getName(), id);
     }

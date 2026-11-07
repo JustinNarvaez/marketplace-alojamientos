@@ -36,7 +36,7 @@ export default function DetallePublicacion() {
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
-        pedir<PublicacionDetalle>(`/listings/${id}`)
+        pedir<PublicacionDetalle>(`/listings/mine/${id}`)
             .then(setPublicacion)
             .catch((err) => {
                 // Escenario 4: una publicacion de otro anfitrion responde 404,
@@ -109,8 +109,8 @@ export default function DetallePublicacion() {
                 <Typography color="text.secondary">Sin reglas particulares.</Typography>
             ) : (
                 <List dense>
-                    {publicacion.reglas.map((regla) => (
-                        <ListItem key={regla} disableGutters>
+                    {publicacion.reglas.map((regla, indice) => (
+                        <ListItem key={indice} disableGutters>
                             <ListItemText primary={regla} />
                         </ListItem>
                     ))}
