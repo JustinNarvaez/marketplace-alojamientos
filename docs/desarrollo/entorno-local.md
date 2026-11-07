@@ -211,6 +211,32 @@ existan dos reservas confirmadas superpuestas para el mismo alojamiento —
 y lo impide **la base de datos**, así que ningún error de código puede
 saltársela.
 
+### Cargar los datos de prueba
+
+Flyway crea las **tablas**, pero no **datos**: cada integrante tiene su
+propia base en Docker, vacía al principio. Para tener los mismos usuarios
+y publicaciones de prueba en cualquier computador, con la aplicación
+arrancada al menos una vez (para que existan las tablas), desde la raíz
+del repositorio:
+
+```bash
+docker exec -i marketplace-db psql -U marketplace -d marketplace -v ON_ERROR_STOP=1 < scripts/datos-prueba.sql
+```
+
+Todas las cuentas usan la clave `Prueba123`:
+
+| Correo | Rol |
+|---|---|
+| `admin@prueba.com` | ADMINISTRADOR |
+| `anfitrion@prueba.com` | ANFITRION, con 3 publicaciones (ACTIVA, ACTIVA y BORRADOR) |
+| `anfitrion2@prueba.com` | ANFITRION, con 2 publicaciones (ACTIVA y PAUSADA) |
+| `huesped@prueba.com`, `huesped2@prueba.com` | HUESPED |
+| `mixto@prueba.com` | HUESPED y ANFITRION a la vez |
+
+Se puede correr las veces que se quiera: no duplica nada y deja las
+cuentas de prueba otra vez con clave `Prueba123` y en estado ACTIVA. No
+es una migración a propósito: no debe llegar a CI ni a ningún despliegue.
+
 ---
 
 ## 10. Abre el proyecto en IntelliJ
