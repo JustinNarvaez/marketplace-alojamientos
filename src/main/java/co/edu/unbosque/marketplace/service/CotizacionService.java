@@ -7,12 +7,8 @@ import co.edu.unbosque.marketplace.exception.PeriodoNoDisponibleException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.model.Publicacion;
 import co.edu.unbosque.marketplace.model.ServicioAdicional;
-import co.edu.unbosque.marketplace.model.enums.EstadoDisponibilidad;
 import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
-import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
-import co.edu.unbosque.marketplace.repository.DisponibilidadRepository;
 import co.edu.unbosque.marketplace.repository.PublicacionRepository;
-import co.edu.unbosque.marketplace.repository.ReservaRepository;
 import co.edu.unbosque.marketplace.repository.ServicioAdicionalRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -20,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.List;
@@ -34,16 +29,10 @@ import java.util.Set;
 @Service
 public class CotizacionService {
 
-    // Un periodo no esta disponible si se cruza con alguno de estos estados.
-    private static final List<EstadoDisponibilidad> PERIODOS_OCUPADOS =
-            List.of(EstadoDisponibilidad.RESERVADO, EstadoDisponibilidad.BLOQUEADO);
-    private static final List<EstadoReserva> RESERVAS_VIGENTES =
-            List.of(EstadoReserva.CONFIRMADA, EstadoReserva.PENDIENTE_APROBACION);
     private static final BigDecimal CIEN = BigDecimal.valueOf(100);
 
     private final PublicacionRepository publicacionRepository;
-    private final DisponibilidadRepository disponibilidadRepository;
-    private final ReservaRepository reservaRepository;
+    private final DisponibilidadService disponibilidadService;
     private final ServicioAdicionalRepository servicioAdicionalRepository;
     // Escenario 2: vienen de application.properties, no del codigo.
     private final BigDecimal porcentajeServicio;
@@ -51,15 +40,13 @@ public class CotizacionService {
     private final int nochesParaDescuento;
 
     public CotizacionService(PublicacionRepository publicacionRepository,
-                             DisponibilidadRepository disponibilidadRepository,
-                             ReservaRepository reservaRepository,
+                             DisponibilidadService disponibilidadService,
                              ServicioAdicionalRepository servicioAdicionalRepository,
                              @Value("${app.cotizacion.porcentaje-servicio}") BigDecimal porcentajeServicio,
                              @Value("${app.cotizacion.porcentaje-descuento}") BigDecimal porcentajeDescuento,
                              @Value("${app.cotizacion.noches-para-descuento}") int nochesParaDescuento) {
         this.publicacionRepository = publicacionRepository;
-        this.disponibilidadRepository = disponibilidadRepository;
-        this.reservaRepository = reservaRepository;
+        this.disponibilidadService = disponibilidadService;
         this.servicioAdicionalRepository = servicioAdicionalRepository;
         this.porcentajeServicio = porcentajeServicio;
         this.porcentajeDescuento = porcentajeDescuento;
@@ -86,7 +73,7 @@ public class CotizacionService {
         }
 
         // Escenario 4: si el periodo no esta libre, no se genera total.
-        if (!estaDisponible(publicacion.getAlojamiento().getIdAlojamiento(),
+        if (!disponibilidadService.estaDisponible(publicacion.getAlojamiento().getIdAlojamiento(),
                 request.fechaLlegada(), request.fechaSalida())) {
             throw new PeriodoNoDisponibleException();
         }
@@ -111,16 +98,6 @@ public class CotizacionService {
                     "Alguno de los servicios adicionales no está disponible para esta publicación.");
         }
         return extras;
-    }
-
-    private boolean estaDisponible(Integer idAlojamiento, LocalDate llegada, LocalDate salida) {
-        boolean calendarioOcupado = disponibilidadRepository
-                .existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
-                        idAlojamiento, PERIODOS_OCUPADOS, salida, llegada);
-        boolean yaReservado = reservaRepository
-                .existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
-                        idAlojamiento, RESERVAS_VIGENTES, salida, llegada);
-        return !calendarioOcupado && !yaReservado;
     }
 
     /**

@@ -30,4 +30,9 @@ public interface DisponibilidadRepository extends JpaRepository<Disponibilidad, 
     // exactamente sus fechas (fecha_inicio = llegada, fecha_fin = salida).
     List<Disponibilidad> findByAlojamiento_IdAlojamientoAndEstadoAndFechaInicioAndFechaFin(
             Integer idAlojamiento, EstadoDisponibilidad estado, LocalDate fechaInicio, LocalDate fechaFin);
+
+    // SCRUM-32: version "lista" del exists de arriba, para poder mostrar
+    // los periodos que se cruzan con [llegada, salida), no solo saber si hay alguno.
+    List<Disponibilidad> findByAlojamiento_IdAlojamientoAndFechaInicioBeforeAndFechaFinAfterOrderByFechaInicio(
+            Integer idAlojamiento, LocalDate salida, LocalDate llegada);
 }

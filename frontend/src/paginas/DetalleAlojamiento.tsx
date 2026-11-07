@@ -16,6 +16,7 @@ import {
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { pedir, ErrorApi } from '../api/cliente'
 import Cotizador from '../componentes/Cotizador'
+import ConsultaDisponibilidad from '../componentes/ConsultaDisponibilidad'
 
 // Coinciden con DetalleAlojamientoResponse del backend (los DTO son el contrato)
 interface Servicio {
@@ -225,9 +226,14 @@ export default function DetalleAlojamiento() {
                     </Paper>
                 </Stack>
 
-                <Paper sx={{ p: 3, width: { xs: '100%', md: 380 }, flexShrink: 0, position: { md: 'sticky' }, top: { md: 16 } }}>
-                    <Cotizador idPublicacion={publicacion.idPublicacion} />
-                </Paper>
+                <Stack spacing={2} sx={{ width: { xs: '100%', md: 380 }, flexShrink: 0, position: { md: 'sticky' }, top: { md: 16 } }}>
+                    <Paper sx={{ p: 3 }}>
+                        <ConsultaDisponibilidad idPublicacion={publicacion.idPublicacion} />
+                    </Paper>
+                    <Paper sx={{ p: 3 }}>
+                        <Cotizador idPublicacion={publicacion.idPublicacion} />
+                    </Paper>
+                </Stack>
             </Box>
         </Stack>
     )

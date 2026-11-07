@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.controller;
 
+import co.edu.unbosque.marketplace.dto.ConsultaDisponibilidadResponse;
 import co.edu.unbosque.marketplace.dto.DisponibilidadResponse;
 import co.edu.unbosque.marketplace.dto.ErrorResponse;
 import co.edu.unbosque.marketplace.dto.GuardarDisponibilidadRequest;
@@ -12,6 +13,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -21,13 +23,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.security.Principal;
+import java.time.LocalDate;
 import java.util.List;
 
-// El calendario que gestiona el anfitrion. La consulta del huesped
-// (GET /api/listings/{id}/availability) es otra historia: SCRUM-32.
+// El calendario que gestiona el anfitrion, y la consulta del huesped
+// (GET /api/listings/{id}/availability, SCRUM-32).
 @RestController
 @RequestMapping("/api/listings")
 @Tag(name = "Disponibilidad", description = "Calendario de disponibilidad del anfitrión (SCRUM-31).")
@@ -53,6 +57,25 @@ public class DisponibilidadController {
     @GetMapping("/mine/{idPublicacion}/availability")
     public List<DisponibilidadResponse> listar(@PathVariable Integer idPublicacion, Principal principal) {
         return disponibilidadService.listar(principal.getName(), idPublicacion);
+    }
+
+    // SCRUM-32: para cualquier usuario autenticado, no solo el dueno.
+    @Operation(summary = "Consultar disponibilidad por fechas",
+            description = "Indica si el rango está libre y diferencia los periodos disponibles, reservados y bloqueados.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Disponibilidad del rango y el detalle de periodos"),
+            @ApiResponse(responseCode = "400", description = "La fecha de salida no es posterior a la de llegada",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Falta el token o ya venció",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "La publicación no existe o ya no está disponible",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    })
+    @GetMapping("/{id}/availability")
+    public ConsultaDisponibilidadResponse consultar(@PathVariable Integer id,
+                                                     @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                                     @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return disponibilidadService.consultar(id, from, to);
     }
 
     @Operation(summary = "Agregar un periodo al calendario",

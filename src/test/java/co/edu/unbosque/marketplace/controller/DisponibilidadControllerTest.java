@@ -1,7 +1,9 @@
 package co.edu.unbosque.marketplace.controller;
 
+import co.edu.unbosque.marketplace.dto.ConsultaDisponibilidadResponse;
 import co.edu.unbosque.marketplace.dto.DisponibilidadResponse;
 import co.edu.unbosque.marketplace.dto.GuardarDisponibilidadRequest;
+import co.edu.unbosque.marketplace.dto.PeriodoDisponibilidadResponse;
 import co.edu.unbosque.marketplace.model.enums.EstadoDisponibilidad;
 import co.edu.unbosque.marketplace.service.DisponibilidadService;
 import org.junit.jupiter.api.Test;
@@ -38,6 +40,16 @@ class DisponibilidadControllerTest {
         when(disponibilidadService.listar("mario@ejemplo.com", 1)).thenReturn(esperada);
 
         assertEquals(esperada, controller.listar(1, principal));
+    }
+
+    @Test
+    void consultarDelegaConElIdYLasFechas() {
+        DisponibilidadController controller = new DisponibilidadController(disponibilidadService);
+        ConsultaDisponibilidadResponse esperada = new ConsultaDisponibilidadResponse(true,
+                List.of(new PeriodoDisponibilidadResponse(INICIO, FIN, "DISPONIBLE")));
+        when(disponibilidadService.consultar(1, INICIO, FIN)).thenReturn(esperada);
+
+        assertEquals(esperada, controller.consultar(1, INICIO, FIN));
     }
 
     @Test
