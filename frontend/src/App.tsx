@@ -13,6 +13,7 @@ import MiCuenta from './paginas/MiCuenta'
 import CrearPublicacion from './paginas/CrearPublicacion'
 import CotizarPublicacion from './paginas/CotizarPublicacion'
 import ServiciosAdicionales from './paginas/ServiciosAdicionales'
+import Auditoria from './paginas/Auditoria'
 
 export default function App() {
     return (
@@ -40,6 +41,7 @@ export default function App() {
                 </Route>
                 <Route element={<RutaProtegida roles={['ADMINISTRADOR']} />}>
                     <Route path="administracion" element={<PaginaPendiente titulo="Administración" />} />
+                    <Route path="administracion/auditoria" element={<Auditoria />} />
                 </Route>
 
                 <Route path="*" element={<NoEncontrado />} />

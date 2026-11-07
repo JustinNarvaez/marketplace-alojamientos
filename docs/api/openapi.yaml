@@ -8,6 +8,8 @@ servers:
 - url: http://localhost:8080
   description: Generated server url
 tags:
+- name: Auditoría
+  description: "Eventos de log_auditoria, solo para ADMINISTRADOR (SCRUM-51)."
 - name: Autenticación
   description: "Registro, inicio de sesión y recuperación de cuenta. Todo público\
     \ (SCRUM-22)."
@@ -522,6 +524,80 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/admin/audit-events:
+    get:
+      tags:
+      - Auditoría
+      summary: Consultar eventos de auditoría
+      description: Del más reciente al más antiguo. Todos los filtros son opcionales.
+      operationId: consultar
+      parameters:
+      - name: desde
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: hasta
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: correo
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: tipo
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - AUTENTICACION
+          - PUBLICACION
+          - RESERVA
+          - CANCELACION
+          - RESENA
+          - EXPORTACION
+          - ACCION_ADMIN
+          - ERROR
+      - name: pagina
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: tamano
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: Página de eventos
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PaginaResponseEventoAuditoriaResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: El usuario autenticado no es ADMINISTRADOR
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
 components:
   schemas:
     ActualizarPerfilRequest:
@@ -942,6 +1018,57 @@ components:
           type: array
           items:
             type: string
+    EventoAuditoriaResponse:
+      type: object
+      properties:
+        idEvento:
+          type: integer
+          format: int64
+        fechaHora:
+          type: string
+          format: date-time
+        actor:
+          type:
+          - string
+          - "null"
+        tipoEvento:
+          type: string
+        accion:
+          type: string
+        entidadAfectada:
+          type:
+          - string
+          - "null"
+        idEntidadAfectada:
+          type:
+          - integer
+          - "null"
+          format: int32
+        resultado:
+          type: string
+        ipOrigen:
+          type:
+          - string
+          - "null"
+    PaginaResponseEventoAuditoriaResponse:
+      type: object
+      properties:
+        contenido:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventoAuditoriaResponse"
+        pagina:
+          type: integer
+          format: int32
+        tamano:
+          type: integer
+          format: int32
+        totalElementos:
+          type: integer
+          format: int64
+        totalPaginas:
+          type: integer
+          format: int32
   securitySchemes:
     bearerAuth:
       type: http
