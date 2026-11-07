@@ -90,6 +90,41 @@ paths:
       security:
       - bearerAuth: []
   /api/listings/{id}:
+    get:
+      tags:
+      - Publicaciones
+      summary: Ver el detalle de un alojamiento
+      description: "Para el huésped: publicación ACTIVA con sus reseñas visibles y\
+        \ la política de cancelación."
+      operationId: obtenerParaHuesped
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: Detalle con reseñas y calificación promedio
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DetalleAlojamientoResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La publicación no existe o ya no está disponible
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
     put:
       tags:
       - Publicaciones
@@ -1588,6 +1623,44 @@ components:
           type: array
           items:
             type: string
+    DetalleAlojamientoResponse:
+      type: object
+      properties:
+        publicacion:
+          $ref: "#/components/schemas/PublicacionResponse"
+        descripcionPoliticaCancelacion:
+          type: string
+        resenas:
+          $ref: "#/components/schemas/ResumenResenasResponse"
+    ResenaResponse:
+      type: object
+      properties:
+        calificacion:
+          type: integer
+          format: int32
+        comentario:
+          type:
+          - string
+          - "null"
+        autor:
+          type: string
+        fecha:
+          type: string
+          format: date-time
+    ResumenResenasResponse:
+      type: object
+      properties:
+        calificacionPromedio:
+          type:
+          - number
+          - "null"
+        totalResenas:
+          type: integer
+          format: int32
+        resenas:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResenaResponse"
     PublicacionResumenResponse:
       type: object
       properties:

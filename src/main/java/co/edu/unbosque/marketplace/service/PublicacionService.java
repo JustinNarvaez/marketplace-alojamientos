@@ -1,6 +1,7 @@
 package co.edu.unbosque.marketplace.service;
 
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
+import co.edu.unbosque.marketplace.dto.DetalleAlojamientoResponse;
 import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.EstadoPublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
@@ -10,6 +11,7 @@ import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
 import co.edu.unbosque.marketplace.exception.NoEsPropietarioException;
 import co.edu.unbosque.marketplace.exception.PublicacionBloqueadaException;
 import co.edu.unbosque.marketplace.exception.PublicacionIncompletaException;
+import co.edu.unbosque.marketplace.exception.PublicacionNoDisponibleException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.ServicioNoEncontradoException;
 import co.edu.unbosque.marketplace.model.Alojamiento;
@@ -60,6 +62,7 @@ public class PublicacionService {
     private final ReglaAlojamientoRepository reglaAlojamientoRepository;
     private final ImagenRepository imagenRepository;
     private final ServicioAuditoria servicioAuditoria;
+    private final ResenaService resenaService;
 
     public PublicacionService(UsuarioRepository usuarioRepository, AnfitrionRepository anfitrionRepository,
                               AdminRepository adminRepository, AlojamientoRepository alojamientoRepository,
@@ -67,7 +70,8 @@ public class PublicacionService {
                               PoliticaCancelacionRepository politicaCancelacionRepository,
                               ServicioRepository servicioRepository,
                               ReglaAlojamientoRepository reglaAlojamientoRepository,
-                              ImagenRepository imagenRepository, ServicioAuditoria servicioAuditoria) {
+                              ImagenRepository imagenRepository, ServicioAuditoria servicioAuditoria,
+                              ResenaService resenaService) {
         this.usuarioRepository = usuarioRepository;
         this.anfitrionRepository = anfitrionRepository;
         this.adminRepository = adminRepository;
@@ -78,6 +82,7 @@ public class PublicacionService {
         this.reglaAlojamientoRepository = reglaAlojamientoRepository;
         this.imagenRepository = imagenRepository;
         this.servicioAuditoria = servicioAuditoria;
+        this.resenaService = resenaService;
     }
 
     /**
@@ -289,6 +294,33 @@ public class PublicacionService {
             reglaAlojamientoRepository.save(new ReglaAlojamiento(publicacion, reglas.get(i), (short) (i + 1)));
         }
         return reglas;
+    }
+
+    /**
+     * SCRUM-35: el detalle que ve el huesped. A diferencia de obtenerDetalle
+     * (SCRUM-30, solo el dueno), aqui cualquiera puede verla, pero solo si
+     * esta publicada (escenario 3).
+     */
+    @Transactional(readOnly = true)
+    public DetalleAlojamientoResponse obtenerParaHuesped(Integer idPublicacion) {
+        Publicacion publicacion = publicacionRepository.findById(idPublicacion)
+                .orElseThrow(PublicacionNoEncontradaException::new);
+        if (!publicacion.esVisibleParaHuespedes()) {
+            throw new PublicacionNoDisponibleException();
+        }
+
+        List<String> reglas = reglaAlojamientoRepository
+                .findByPublicacion_IdPublicacionOrderByOrdenAsc(idPublicacion).stream()
+                .map(ReglaAlojamiento::getDescripcion)
+                .toList();
+        List<String> imagenes = imagenRepository
+                .findByPublicacion_IdPublicacionOrderByOrdenAsc(idPublicacion).stream()
+                .map(Imagen::getRuta)
+                .toList();
+
+        return new DetalleAlojamientoResponse(aResponse(publicacion, reglas, imagenes),
+                publicacion.getPoliticaCancelacion().getDescripcion(),
+                resenaService.resumenDe(idPublicacion));
     }
 
     // La primera imagen es la portada: la base permite solo una por publicacion.

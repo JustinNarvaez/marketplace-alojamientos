@@ -109,6 +109,12 @@ export default function DetallePublicacion() {
                         to={`/mis-publicaciones/${publicacion.idPublicacion}/extras`}>
                     Servicios adicionales
                 </Button>
+                {publicacion.estado === 'ACTIVA' && (
+                    <Button variant="outlined" size="small" component={RouterLink}
+                            to={`/alojamientos/${publicacion.idPublicacion}`}>
+                        Ver como huésped
+                    </Button>
+                )}
             </Stack>
 
             {publicacion.imagenes.length > 0 && (
