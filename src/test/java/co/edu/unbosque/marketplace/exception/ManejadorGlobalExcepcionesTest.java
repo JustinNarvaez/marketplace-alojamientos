@@ -106,6 +106,30 @@ class ManejadorGlobalExcepcionesTest {
         assertEquals("Alguno de los servicios seleccionados no existe.", respuesta.getBody().mensaje());
     }
 
+    @Test
+    void cotizacionInvalidaResponde400ConSuMotivo() {
+        ResponseEntity<ErrorResponse> respuesta =
+                manejador.manejar(new CotizacionInvalidaException("La fecha de salida debe ser posterior a la de llegada."));
+
+        assertEquals(HttpStatus.BAD_REQUEST, respuesta.getStatusCode());
+        assertEquals("La fecha de salida debe ser posterior a la de llegada.", respuesta.getBody().mensaje());
+    }
+
+    @Test
+    void publicacionNoEncontradaResponde404() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new PublicacionNoEncontradaException());
+
+        assertEquals(HttpStatus.NOT_FOUND, respuesta.getStatusCode());
+    }
+
+    @Test
+    void periodoNoDisponibleResponde409() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new PeriodoNoDisponibleException());
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals("El alojamiento no está disponible en esas fechas. Prueba con otras.", respuesta.getBody().mensaje());
+    }
+
     @AfterEach
     void limpiarMdc() {
         MDC.clear();

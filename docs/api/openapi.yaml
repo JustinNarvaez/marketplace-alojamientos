@@ -17,6 +17,8 @@ tags:
   description: Publicaciones de alojamientos del anfitrión (SCRUM-27).
 - name: Mi cuenta
   description: Perfil y estado de la cuenta del usuario autenticado (SCRUM-25/26).
+- name: Cotizaciones
+  description: Cotización de una estancia con desglose de tarifas (SCRUM-36).
 paths:
   /api/users/me:
     get:
@@ -135,6 +137,54 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
           description: El usuario autenticado no es ADMINISTRADOR
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/quotes:
+    post:
+      tags:
+      - Cotizaciones
+      summary: Cotizar una estancia
+      description: "Calcula noches, subtotal, limpieza, tarifa de servicio, descuento\
+        \ y total. No guarda nada."
+      operationId: cotizar
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CotizacionRequest"
+        required: true
+      responses:
+        "200":
+          description: Cotización con desglose
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CotizacionResponse"
+        "400":
+          description: "Fechas inválidas, más huéspedes que la capacidad o publicació\
+            n no activa"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La publicación no existe
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: El periodo no está disponible
           content:
             '*/*':
               schema:
@@ -452,6 +502,57 @@ components:
           type:
           - string
           - "null"
+    CotizacionRequest:
+      type: object
+      properties:
+        idPublicacion:
+          type: integer
+          format: int32
+        fechaLlegada:
+          type: string
+          format: date
+        fechaSalida:
+          type: string
+          format: date
+        numeroHuespedes:
+          type: integer
+          format: int32
+          minimum: 1
+      required:
+      - fechaLlegada
+      - fechaSalida
+      - idPublicacion
+      - numeroHuespedes
+    CotizacionResponse:
+      type: object
+      properties:
+        idPublicacion:
+          type: integer
+          format: int32
+        fechaLlegada:
+          type: string
+          format: date
+        fechaSalida:
+          type: string
+          format: date
+        numeroHuespedes:
+          type: integer
+          format: int32
+        noches:
+          type: integer
+          format: int32
+        precioNoche:
+          type: number
+        subtotalAlojamiento:
+          type: number
+        tarifaLimpieza:
+          type: number
+        tarifaServicio:
+          type: number
+        descuento:
+          type: number
+        total:
+          type: number
     CrearPublicacionRequest:
       type: object
       properties:

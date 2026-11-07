@@ -11,6 +11,7 @@ import NoEncontrado from './paginas/NoEncontrado'
 import PaginaPendiente from './paginas/PaginaPendiente'
 import MiCuenta from './paginas/MiCuenta'
 import CrearPublicacion from './paginas/CrearPublicacion'
+import CotizarPublicacion from './paginas/CotizarPublicacion'
 
 export default function App() {
     return (
@@ -25,6 +26,7 @@ export default function App() {
 
                 <Route element={<RutaProtegida />}>
                     <Route path="mi-cuenta" element={<MiCuenta />} />
+                    <Route path="cotizar/:idPublicacion" element={<CotizarPublicacion />} />
                 </Route>
 
                 <Route element={<RutaProtegida roles={['HUESPED']} />}>
