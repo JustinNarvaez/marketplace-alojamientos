@@ -89,6 +89,11 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(BusquedaInvalidaException.class)
+    public ResponseEntity<ErrorResponse> manejar(BusquedaInvalidaException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(DisponibilidadNoEncontradaException.class)
     public ResponseEntity<ErrorResponse> manejar(DisponibilidadNoEncontradaException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));

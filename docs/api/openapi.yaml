@@ -23,6 +23,8 @@ tags:
   description: Extras con precio que ofrece cada publicación (SCRUM-37).
 - name: Mi cuenta
   description: Perfil y estado de la cuenta del usuario autenticado (SCRUM-25/26).
+- name: Búsqueda
+  description: Búsqueda pública de alojamientos con filtros (SCRUM-34).
 - name: Disponibilidad
   description: Calendario de disponibilidad del anfitrión (SCRUM-31).
 - name: Cotizaciones
@@ -1011,6 +1013,83 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/listings/search:
+    get:
+      tags:
+      - Búsqueda
+      summary: Buscar alojamientos
+      description: "Pública, sin sesión. Todos los filtros son opcionales. Solo publicaciones\
+        \ ACTIVAS."
+      operationId: buscar
+      parameters:
+      - name: city
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: guests
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - CASA
+          - APARTAMENTO
+          - HABITACION
+          - CABANA
+          - FINCA
+      - name: minPrice
+        in: query
+        required: false
+        schema:
+          type: number
+      - name: maxPrice
+        in: query
+        required: false
+        schema:
+          type: number
+      - name: amenities
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: Resultados que cumplen todos los filtros aplicados (vacío si
+            ninguno coincide)
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ResultadoBusquedaResponse"
+        "400":
+          description: Rango de fechas inválido
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/listings/mine:
     get:
       tags:
@@ -1878,6 +1957,27 @@ components:
           format: date
         estado:
           type: string
+    ResultadoBusquedaResponse:
+      type: object
+      properties:
+        idPublicacion:
+          type: integer
+          format: int32
+        titulo:
+          type: string
+        ciudad:
+          type: string
+        tipoAlojamiento:
+          type: string
+        capacidad:
+          type: integer
+          format: int32
+        precioNoche:
+          type: number
+        imagenPortada:
+          type:
+          - string
+          - "null"
     PublicacionResumenResponse:
       type: object
       properties:
