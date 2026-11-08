@@ -6,4 +6,9 @@ public class PublicacionIncompletaException extends RuntimeException {
     public PublicacionIncompletaException() {
         super("No puedes activarla: agrega al menos una imagen.");
     }
+
+    // SCRUM-42, escenario 3: otro dato minimo que falta (p. ej. la politica).
+    public PublicacionIncompletaException(String mensaje) {
+        super(mensaje);
+    }
 }
