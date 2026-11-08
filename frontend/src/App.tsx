@@ -17,6 +17,7 @@ import ServiciosAdicionales from './paginas/ServiciosAdicionales'
 import Auditoria from './paginas/Auditoria'
 import AdminUsuarios from './paginas/AdminUsuarios'
 import AdminPublicaciones from './paginas/AdminPublicaciones'
+import AdminResenas from './paginas/AdminResenas'
 import Reportes from './paginas/Reportes'
 import MisPublicaciones from './paginas/MisPublicaciones'
 import DetallePublicacion from './paginas/DetallePublicacion'
@@ -56,6 +57,7 @@ export default function App() {
                     <Route path="administracion" element={<PaginaPendiente titulo="Administración" />} />
                     <Route path="administracion/usuarios" element={<AdminUsuarios />} />
                     <Route path="administracion/publicaciones" element={<AdminPublicaciones />} />
+                    <Route path="administracion/resenas" element={<AdminResenas />} />
                     <Route path="administracion/auditoria" element={<Auditoria />} />
                     <Route path="administracion/reportes" element={<Reportes />} />
                 </Route>

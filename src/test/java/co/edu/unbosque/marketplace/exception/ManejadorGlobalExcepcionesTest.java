@@ -191,6 +191,23 @@ class ManejadorGlobalExcepcionesTest {
     }
 
     @Test
+    void cambioVisibilidadResenaInvalidoResponde409() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(
+                new CambioVisibilidadResenaInvalidoException("Esta reseña ya está oculta."));
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals("Esta reseña ya está oculta.", respuesta.getBody().mensaje());
+    }
+
+    @Test
+    void resenaNoEncontradaResponde404() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new ResenaNoEncontradaException());
+
+        assertEquals(HttpStatus.NOT_FOUND, respuesta.getStatusCode());
+        assertEquals("La reseña no existe.", respuesta.getBody().mensaje());
+    }
+
+    @Test
     void periodoNoDisponibleResponde409() {
         ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new PeriodoNoDisponibleException());
 

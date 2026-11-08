@@ -1,6 +1,8 @@
 package co.edu.unbosque.marketplace.repository;
 
 import co.edu.unbosque.marketplace.model.Resena;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -11,4 +13,7 @@ public interface ResenaRepository extends JpaRepository<Resena, Integer> {
     // Recorre resena -> reserva -> publicacion; las ocultas (moderacion) no salen.
     List<Resena> findByReserva_Publicacion_IdPublicacionAndOcultaFalseOrderByFechaPublicacionDesc(
             Integer idPublicacion);
+
+    // SCRUM-50: listado del administrador, filtrando por visibilidad.
+    Page<Resena> findByOculta(Boolean oculta, Pageable pageable);
 }
