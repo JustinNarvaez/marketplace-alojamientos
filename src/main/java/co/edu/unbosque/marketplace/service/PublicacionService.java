@@ -1,9 +1,12 @@
 package co.edu.unbosque.marketplace.service;
 
+import co.edu.unbosque.marketplace.dto.BloqueoPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.DetalleAlojamientoResponse;
 import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.EstadoPublicacionResponse;
+import co.edu.unbosque.marketplace.dto.PaginaResponse;
+import co.edu.unbosque.marketplace.dto.PublicacionAdminResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
 import co.edu.unbosque.marketplace.dto.ServicioResponse;
@@ -17,27 +20,36 @@ import co.edu.unbosque.marketplace.exception.ServicioNoEncontradoException;
 import co.edu.unbosque.marketplace.model.Alojamiento;
 import co.edu.unbosque.marketplace.model.Anfitrion;
 import co.edu.unbosque.marketplace.model.Imagen;
+import co.edu.unbosque.marketplace.model.Notificacion;
 import co.edu.unbosque.marketplace.model.PoliticaCancelacion;
 import co.edu.unbosque.marketplace.model.Publicacion;
 import co.edu.unbosque.marketplace.model.ReglaAlojamiento;
 import co.edu.unbosque.marketplace.model.Servicio;
 import co.edu.unbosque.marketplace.model.Usuario;
 import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
+import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
 import co.edu.unbosque.marketplace.model.enums.ResultadoAuditoria;
 import co.edu.unbosque.marketplace.model.enums.TipoEventoAuditoria;
 import co.edu.unbosque.marketplace.repository.AdminRepository;
 import co.edu.unbosque.marketplace.repository.AlojamientoRepository;
 import co.edu.unbosque.marketplace.repository.AnfitrionRepository;
 import co.edu.unbosque.marketplace.repository.ImagenRepository;
+import co.edu.unbosque.marketplace.repository.NotificacionRepository;
 import co.edu.unbosque.marketplace.repository.PoliticaCancelacionRepository;
 import co.edu.unbosque.marketplace.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.repository.ReglaAlojamientoRepository;
+import co.edu.unbosque.marketplace.repository.ReservaRepository;
 import co.edu.unbosque.marketplace.repository.ServicioRepository;
 import co.edu.unbosque.marketplace.repository.UsuarioRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.List;
@@ -48,6 +60,9 @@ import java.util.Set;
 public class PublicacionService {
 
     private static final String POLITICA_POR_DEFECTO = "FLEXIBLE";
+    private static final int TAMANO_MAXIMO = 50;
+    private static final List<EstadoReserva> RESERVAS_VIGENTES =
+            List.of(EstadoReserva.PENDIENTE_APROBACION, EstadoReserva.CONFIRMADA);
 
     private final UsuarioRepository usuarioRepository;
     private final AnfitrionRepository anfitrionRepository;
@@ -60,6 +75,8 @@ public class PublicacionService {
     private final ImagenRepository imagenRepository;
     private final ServicioAuditoria servicioAuditoria;
     private final ResenaService resenaService;
+    private final ReservaRepository reservaRepository;
+    private final NotificacionRepository notificacionRepository;
 
     public PublicacionService(UsuarioRepository usuarioRepository, AnfitrionRepository anfitrionRepository,
                               AdminRepository adminRepository, AlojamientoRepository alojamientoRepository,
@@ -68,7 +85,8 @@ public class PublicacionService {
                               ServicioRepository servicioRepository,
                               ReglaAlojamientoRepository reglaAlojamientoRepository,
                               ImagenRepository imagenRepository, ServicioAuditoria servicioAuditoria,
-                              ResenaService resenaService) {
+                              ResenaService resenaService, ReservaRepository reservaRepository,
+                              NotificacionRepository notificacionRepository) {
         this.usuarioRepository = usuarioRepository;
         this.anfitrionRepository = anfitrionRepository;
         this.adminRepository = adminRepository;
@@ -80,6 +98,8 @@ public class PublicacionService {
         this.imagenRepository = imagenRepository;
         this.servicioAuditoria = servicioAuditoria;
         this.resenaService = resenaService;
+        this.reservaRepository = reservaRepository;
+        this.notificacionRepository = notificacionRepository;
     }
 
     /**
@@ -269,6 +289,85 @@ public class PublicacionService {
                 new ServicioAuditoria.CambioEstado(estadoAnterior, publicacion.getEstado().name()), ipOrigen);
 
         return new EstadoPublicacionResponse(publicacion.getEstado().name());
+    }
+
+    /**
+     * SCRUM-48: listado del administrador. Busca por titulo y, si llega,
+     * filtra por estado (por ejemplo, solo las BLOQUEADA).
+     */
+    @Transactional(readOnly = true)
+    public PaginaResponse<PublicacionAdminResponse> listarParaAdmin(String busqueda, EstadoPublicacion estado,
+                                                                   int pagina, int tamano) {
+        String texto = busqueda == null ? "" : busqueda.trim();
+        Pageable pedido = PageRequest.of(Math.max(pagina, 0), Math.clamp(tamano, 1, TAMANO_MAXIMO),
+                Sort.by(Sort.Direction.DESC, "fechaCreacion").and(Sort.by(Sort.Direction.DESC, "idPublicacion")));
+        Page<Publicacion> publicaciones = estado == null
+                ? publicacionRepository.findByTituloContainingIgnoreCase(texto, pedido)
+                : publicacionRepository.findByTituloContainingIgnoreCaseAndEstado(texto, estado, pedido);
+        return new PaginaResponse<>(publicaciones.getContent().stream().map(this::aRespuestaAdmin).toList(),
+                publicaciones.getNumber(), publicaciones.getSize(), publicaciones.getTotalElements(),
+                publicaciones.getTotalPages());
+    }
+
+    /**
+     * SCRUM-48. Bloquea o desbloquea una publicacion.
+     * Escenario 1: queda BLOQUEADA y deja de verse (esVisibleParaHuespedes
+     * solo acepta ACTIVA, y la busqueda de SCRUM-34 debe filtrar igual).
+     * Escenario 2: las reservas no se tocan: se conservan para auditoria y
+     * el administrador ve cuantas quedan para revision manual.
+     * Escenario 3: notificacion al anfitrion y evento de auditoria con el motivo.
+     */
+    @Transactional
+    public PublicacionAdminResponse cambiarBloqueo(String correoAdmin, Integer idPublicacion,
+                                                   BloqueoPublicacionRequest request, String ipOrigen) {
+        Usuario administrador = usuarioRepository.findByEmail(correoAdmin)
+                .orElseThrow(CredencialesInvalidasException::new);
+        Publicacion publicacion = publicacionRepository.findById(idPublicacion)
+                .orElseThrow(PublicacionNoEncontradaException::new);
+        String motivo = request.motivo().trim();
+
+        String estadoAnterior = publicacion.getEstado().name();
+        boolean bloquear = Boolean.TRUE.equals(request.bloqueada());
+        if (bloquear) {
+            publicacion.bloquear();
+        } else {
+            publicacion.desbloquear();
+        }
+        publicacionRepository.save(publicacion);
+
+        PublicacionAdminResponse respuesta = aRespuestaAdmin(publicacion);
+        Usuario anfitrion = publicacion.getAlojamiento().getAnfitrion().getUsuario();
+        notificacionRepository.save(new Notificacion(anfitrion, "MODERACION",
+                bloquear ? "Tu publicación fue bloqueada" : "Tu publicación fue desbloqueada",
+                mensajeBloqueo(publicacion.getTitulo(), bloquear, motivo, respuesta.reservasFuturas()),
+                false, OffsetDateTime.now(), "PUBLICACION", publicacion.getIdPublicacion()));
+
+        servicioAuditoria.registrarAccionAdmin(administrador, "publicacion", publicacion.getIdPublicacion(),
+                bloquear ? "BLOQUEO_PUBLICACION" : "DESBLOQUEO_PUBLICACION",
+                new ServicioAuditoria.CambioEstado(estadoAnterior, publicacion.getEstado().name()), motivo, ipOrigen);
+        return respuesta;
+    }
+
+    private static String mensajeBloqueo(String titulo, boolean bloquear, String motivo, long reservasFuturas) {
+        if (!bloquear) {
+            return "Un administrador desbloqueó \"" + titulo + "\". Quedó pausada: actívala cuando quieras. "
+                    + "Motivo: " + motivo;
+        }
+        String mensaje = "Un administrador bloqueó \"" + titulo + "\" y ya no aparece para los huéspedes. "
+                + "Motivo: " + motivo;
+        if (reservasFuturas > 0) {
+            mensaje += " Tus " + reservasFuturas + " reservas vigentes se conservan y quedan en revisión manual.";
+        }
+        return mensaje;
+    }
+
+    private PublicacionAdminResponse aRespuestaAdmin(Publicacion publicacion) {
+        long reservasFuturas = reservaRepository.countByPublicacion_IdPublicacionAndEstadoInAndFechaSalidaAfter(
+                publicacion.getIdPublicacion(), RESERVAS_VIGENTES, LocalDate.now());
+        return new PublicacionAdminResponse(publicacion.getIdPublicacion(), publicacion.getTitulo(),
+                publicacion.getAlojamiento().getCiudad(),
+                publicacion.getAlojamiento().getAnfitrion().getUsuario().getEmail(),
+                publicacion.getEstado().name(), publicacion.getPrecioNoche(), reservasFuturas);
     }
 
     // Si piden un id que no existe, findAllById devuelve menos servicios que ids.

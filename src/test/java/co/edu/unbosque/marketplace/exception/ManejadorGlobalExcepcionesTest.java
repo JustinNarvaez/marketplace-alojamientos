@@ -182,6 +182,15 @@ class ManejadorGlobalExcepcionesTest {
     }
 
     @Test
+    void cambioEstadoPublicacionInvalidoResponde409() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(
+                new CambioEstadoPublicacionInvalidoException("Esta publicación ya está bloqueada."));
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals("Esta publicación ya está bloqueada.", respuesta.getBody().mensaje());
+    }
+
+    @Test
     void periodoNoDisponibleResponde409() {
         ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new PeriodoNoDisponibleException());
 
