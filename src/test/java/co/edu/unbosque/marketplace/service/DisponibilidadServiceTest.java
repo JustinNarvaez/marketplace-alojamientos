@@ -1,12 +1,16 @@
 package co.edu.unbosque.marketplace.service;
 
+import co.edu.unbosque.marketplace.dto.ConsultaDisponibilidadResponse;
 import co.edu.unbosque.marketplace.dto.DisponibilidadResponse;
 import co.edu.unbosque.marketplace.dto.GuardarDisponibilidadRequest;
+import co.edu.unbosque.marketplace.dto.PeriodoDisponibilidadResponse;
 import co.edu.unbosque.marketplace.exception.DisponibilidadInvalidaException;
 import co.edu.unbosque.marketplace.exception.DisponibilidadNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.NoEsPropietarioException;
 import co.edu.unbosque.marketplace.exception.PeriodoNoDisponibleException;
 import co.edu.unbosque.marketplace.exception.PeriodoSuperpuestoException;
+import co.edu.unbosque.marketplace.exception.PublicacionNoDisponibleException;
+import co.edu.unbosque.marketplace.exception.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.ReservaNoConfirmableException;
 import co.edu.unbosque.marketplace.model.Alojamiento;
 import co.edu.unbosque.marketplace.model.Anfitrion;
@@ -17,6 +21,7 @@ import co.edu.unbosque.marketplace.model.Reserva;
 import co.edu.unbosque.marketplace.model.Usuario;
 import co.edu.unbosque.marketplace.model.enums.EstadoCuenta;
 import co.edu.unbosque.marketplace.model.enums.EstadoDisponibilidad;
+import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
 import co.edu.unbosque.marketplace.model.enums.TipoAlojamiento;
 import co.edu.unbosque.marketplace.repository.AlojamientoRepository;
@@ -41,7 +46,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
@@ -84,7 +91,10 @@ class DisponibilidadServiceTest {
         alojamiento.setIdAlojamiento(ID_ALOJAMIENTO);
         publicacion = mock(Publicacion.class);
         // lenient: las pruebas de SCRUM-33 parten de una reserva, no de la
-        // publicacion; y la del 403 entra con otro correo.
+        // publicacion; las de consultar() (SCRUM-32) re-stubean esto con una
+        // Publicacion real antes de llamar, para que esVisibleParaHuespedes()
+        // funcione de verdad (no es un metodo que se pueda mockear con sentido);
+        // y la del 403 entra con otro correo.
         lenient().when(publicacion.getAlojamiento()).thenReturn(alojamiento);
         lenient().when(publicacionRepository.findById(ID_PUBLICACION)).thenReturn(Optional.of(publicacion));
         lenient().when(usuarioRepository.findByEmail(CORREO)).thenReturn(Optional.of(mario));
@@ -395,5 +405,139 @@ class DisponibilidadServiceTest {
         Usuario usuario = new Usuario("Mario", "Perez", correo, "hash", null, OffsetDateTime.now(), EstadoCuenta.ACTIVA);
         usuario.setIdUsuario(id);
         return usuario;
+    }
+
+    // ===== SCRUM-32: consultar() =====
+
+    private Publicacion publicacionConEstado(EstadoPublicacion estado) {
+        Publicacion publicacion = new Publicacion(alojamiento, null, "Casa", "Descripcion",
+                new BigDecimal("100000"), BigDecimal.ZERO, true, estado, OffsetDateTime.now(), null);
+        publicacion.setIdPublicacion(ID_PUBLICACION);
+        return publicacion;
+    }
+
+    // Pendiente: una CONFIRMADA ya tiene su periodo RESERVADO en disponibilidad
+    // (SCRUM-33 lo crea al confirmar), asi que consultar() no la vuelve a pedir.
+    private Reserva unaReservaPendiente(LocalDate llegada, LocalDate salida) {
+        return new Reserva(null, alojamiento, null, llegada, salida, (short) 2, EstadoReserva.PENDIENTE_APROBACION,
+                OffsetDateTime.now(), "clave-" + llegada, BigDecimal.ZERO, (short) 1, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    // sinOcupacion(): ni el calendario ni las reservas tienen nada en [INICIO, FIN).
+    private void sinOcupacionEntre(LocalDate inicio, LocalDate fin) {
+        when(disponibilidadRepository.findByAlojamiento_IdAlojamientoAndFechaInicioBeforeAndFechaFinAfterOrderByFechaInicio(
+                ID_ALOJAMIENTO, fin, inicio)).thenReturn(List.of());
+        when(reservaRepository.findByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
+                ID_ALOJAMIENTO, DisponibilidadService.RESERVAS_PENDIENTES, fin, inicio)).thenReturn(List.of());
+        when(disponibilidadRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
+                ID_ALOJAMIENTO, DisponibilidadService.PERIODOS_OCUPADOS, fin, inicio)).thenReturn(false);
+        when(reservaRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
+                ID_ALOJAMIENTO, DisponibilidadService.RESERVAS_ACTIVAS, fin, inicio)).thenReturn(false);
+    }
+
+    @Test
+    void consultarEscenario1_activaYSinOcupacionQuedaDisponibleConUnSoloPeriodo() {
+        when(publicacionRepository.findById(ID_PUBLICACION)).thenReturn(Optional.of(publicacionConEstado(EstadoPublicacion.ACTIVA)));
+        sinOcupacionEntre(INICIO, FIN);
+
+        ConsultaDisponibilidadResponse respuesta = servicio.consultar(ID_PUBLICACION, INICIO, FIN);
+
+        assertTrue(respuesta.disponible());
+        assertEquals(List.of(new PeriodoDisponibilidadResponse(INICIO, FIN, "DISPONIBLE")), respuesta.periodos());
+    }
+
+    @Test
+    void consultarEscenario2_siElRangoSeCruzaConUnBloqueoNoEstaDisponible() {
+        when(publicacionRepository.findById(ID_PUBLICACION)).thenReturn(Optional.of(publicacionConEstado(EstadoPublicacion.ACTIVA)));
+        LocalDate bloqueoInicio = INICIO.plusDays(2);
+        LocalDate bloqueoFin = INICIO.plusDays(4);
+        Disponibilidad bloqueo = new Disponibilidad(alojamiento, bloqueoInicio, bloqueoFin, EstadoDisponibilidad.BLOQUEADO);
+        when(disponibilidadRepository.findByAlojamiento_IdAlojamientoAndFechaInicioBeforeAndFechaFinAfterOrderByFechaInicio(
+                ID_ALOJAMIENTO, FIN, INICIO)).thenReturn(List.of(bloqueo));
+        when(reservaRepository.findByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
+                ID_ALOJAMIENTO, DisponibilidadService.RESERVAS_PENDIENTES, FIN, INICIO)).thenReturn(List.of());
+        when(disponibilidadRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
+                ID_ALOJAMIENTO, DisponibilidadService.PERIODOS_OCUPADOS, FIN, INICIO)).thenReturn(true);
+        when(reservaRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
+                ID_ALOJAMIENTO, DisponibilidadService.RESERVAS_ACTIVAS, FIN, INICIO)).thenReturn(false);
+
+        ConsultaDisponibilidadResponse respuesta = servicio.consultar(ID_PUBLICACION, INICIO, FIN);
+
+        assertFalse(respuesta.disponible());
+        assertEquals(List.of(
+                new PeriodoDisponibilidadResponse(INICIO, bloqueoInicio, "DISPONIBLE"),
+                new PeriodoDisponibilidadResponse(bloqueoInicio, bloqueoFin, "BLOQUEADO"),
+                new PeriodoDisponibilidadResponse(bloqueoFin, FIN, "DISPONIBLE")
+        ), respuesta.periodos());
+    }
+
+    // Regresion: un hueco implicito DISPONIBLE pegado a un periodo DISPONIBLE
+    // explicito no debe verse como dos entradas identicas consecutivas.
+    // Se encontro probando contra datos reales (scripts/datos-prueba.sql).
+    @Test
+    void consultarFusionaUnHuecoDisponibleConUnPeriodoExplicitoContiguoDelMismoEstado() {
+        when(publicacionRepository.findById(ID_PUBLICACION)).thenReturn(Optional.of(publicacionConEstado(EstadoPublicacion.ACTIVA)));
+        LocalDate explicitoInicio = INICIO.plusDays(2);
+        Disponibilidad disponible = new Disponibilidad(alojamiento, explicitoInicio, FIN, EstadoDisponibilidad.DISPONIBLE);
+        when(disponibilidadRepository.findByAlojamiento_IdAlojamientoAndFechaInicioBeforeAndFechaFinAfterOrderByFechaInicio(
+                ID_ALOJAMIENTO, FIN, INICIO)).thenReturn(List.of(disponible));
+        when(reservaRepository.findByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
+                ID_ALOJAMIENTO, DisponibilidadService.RESERVAS_PENDIENTES, FIN, INICIO)).thenReturn(List.of());
+        when(disponibilidadRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
+                ID_ALOJAMIENTO, DisponibilidadService.PERIODOS_OCUPADOS, FIN, INICIO)).thenReturn(false);
+        when(reservaRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
+                ID_ALOJAMIENTO, DisponibilidadService.RESERVAS_ACTIVAS, FIN, INICIO)).thenReturn(false);
+
+        ConsultaDisponibilidadResponse respuesta = servicio.consultar(ID_PUBLICACION, INICIO, FIN);
+
+        assertEquals(List.of(new PeriodoDisponibilidadResponse(INICIO, FIN, "DISPONIBLE")), respuesta.periodos());
+    }
+
+    @Test
+    void consultarEscenario3_laSalidaNoPosteriorALaLlegadaResponde400() {
+        assertThrows(DisponibilidadInvalidaException.class, () -> servicio.consultar(ID_PUBLICACION, FIN, INICIO));
+        assertThrows(DisponibilidadInvalidaException.class, () -> servicio.consultar(ID_PUBLICACION, INICIO, INICIO));
+    }
+
+    @Test
+    void consultarEscenario4_diferenciaDisponibleBloqueadoYReservado() {
+        when(publicacionRepository.findById(ID_PUBLICACION)).thenReturn(Optional.of(publicacionConEstado(EstadoPublicacion.ACTIVA)));
+        LocalDate reservaInicio = INICIO.plusDays(5);
+        LocalDate reservaFin = INICIO.plusDays(7);
+        Disponibilidad bloqueo = new Disponibilidad(alojamiento, INICIO, INICIO.plusDays(2), EstadoDisponibilidad.BLOQUEADO);
+        Reserva reserva = unaReservaPendiente(reservaInicio, reservaFin);
+        when(disponibilidadRepository.findByAlojamiento_IdAlojamientoAndFechaInicioBeforeAndFechaFinAfterOrderByFechaInicio(
+                ID_ALOJAMIENTO, FIN, INICIO)).thenReturn(List.of(bloqueo));
+        when(reservaRepository.findByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
+                ID_ALOJAMIENTO, DisponibilidadService.RESERVAS_PENDIENTES, FIN, INICIO)).thenReturn(List.of(reserva));
+        when(disponibilidadRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
+                ID_ALOJAMIENTO, DisponibilidadService.PERIODOS_OCUPADOS, FIN, INICIO)).thenReturn(true);
+        when(reservaRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
+                ID_ALOJAMIENTO, DisponibilidadService.RESERVAS_ACTIVAS, FIN, INICIO)).thenReturn(true);
+
+        ConsultaDisponibilidadResponse respuesta = servicio.consultar(ID_PUBLICACION, INICIO, FIN);
+
+        assertFalse(respuesta.disponible());
+        assertEquals(List.of(
+                new PeriodoDisponibilidadResponse(INICIO, INICIO.plusDays(2), "BLOQUEADO"),
+                new PeriodoDisponibilidadResponse(INICIO.plusDays(2), reservaInicio, "DISPONIBLE"),
+                new PeriodoDisponibilidadResponse(reservaInicio, reservaFin, "RESERVADO"),
+                new PeriodoDisponibilidadResponse(reservaFin, FIN, "DISPONIBLE")
+        ), respuesta.periodos());
+    }
+
+    @Test
+    void consultarSiLaPublicacionNoExisteResponde404() {
+        when(publicacionRepository.findById(ID_PUBLICACION)).thenReturn(Optional.empty());
+
+        assertThrows(PublicacionNoEncontradaException.class, () -> servicio.consultar(ID_PUBLICACION, INICIO, FIN));
+    }
+
+    @Test
+    void consultarSiNoEstaActivaResponde404ConMensajeDistinto() {
+        when(publicacionRepository.findById(ID_PUBLICACION)).thenReturn(Optional.of(publicacionConEstado(EstadoPublicacion.BORRADOR)));
+
+        assertThrows(PublicacionNoDisponibleException.class, () -> servicio.consultar(ID_PUBLICACION, INICIO, FIN));
     }
 }

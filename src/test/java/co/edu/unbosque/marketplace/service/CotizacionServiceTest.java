@@ -10,9 +10,7 @@ import co.edu.unbosque.marketplace.model.Publicacion;
 import co.edu.unbosque.marketplace.model.ServicioAdicional;
 import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
 import co.edu.unbosque.marketplace.model.enums.TipoAlojamiento;
-import co.edu.unbosque.marketplace.repository.DisponibilidadRepository;
 import co.edu.unbosque.marketplace.repository.PublicacionRepository;
-import co.edu.unbosque.marketplace.repository.ReservaRepository;
 import co.edu.unbosque.marketplace.repository.ServicioAdicionalRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,7 +28,6 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -46,9 +43,7 @@ class CotizacionServiceTest {
     @Mock
     private PublicacionRepository publicacionRepository;
     @Mock
-    private DisponibilidadRepository disponibilidadRepository;
-    @Mock
-    private ReservaRepository reservaRepository;
+    private DisponibilidadService disponibilidadService;
     @Mock
     private ServicioAdicionalRepository servicioAdicionalRepository;
 
@@ -56,8 +51,8 @@ class CotizacionServiceTest {
 
     @BeforeEach
     void preparar() {
-        cotizacionService = new CotizacionService(publicacionRepository, disponibilidadRepository,
-                reservaRepository, servicioAdicionalRepository, BigDecimal.TEN, BigDecimal.TEN, 7);
+        cotizacionService = new CotizacionService(publicacionRepository, disponibilidadService,
+                servicioAdicionalRepository, BigDecimal.TEN, BigDecimal.TEN, 7);
     }
 
     private Publicacion unaPublicacion(EstadoPublicacion estado) {
@@ -73,10 +68,7 @@ class CotizacionServiceTest {
 
     private void publicacionActivaYLibre() {
         when(publicacionRepository.findById(1)).thenReturn(Optional.of(unaPublicacion(EstadoPublicacion.ACTIVA)));
-        when(disponibilidadRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
-                eq(3), anyCollection(), any(), any())).thenReturn(false);
-        when(reservaRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
-                eq(3), anyCollection(), any(), any())).thenReturn(false);
+        when(disponibilidadService.estaDisponible(eq(3), any(), any())).thenReturn(true);
     }
 
     private CotizacionRequest solicitud(int noches, int huespedes) {
@@ -129,8 +121,8 @@ class CotizacionServiceTest {
 
     @Test
     void escenario2_usaLosPorcentajesConfigurados() {
-        cotizacionService = new CotizacionService(publicacionRepository, disponibilidadRepository,
-                reservaRepository, servicioAdicionalRepository, new BigDecimal("15"), new BigDecimal("20"), 3);
+        cotizacionService = new CotizacionService(publicacionRepository, disponibilidadService,
+                servicioAdicionalRepository, new BigDecimal("15"), new BigDecimal("20"), 3);
         publicacionActivaYLibre();
 
         CotizacionResponse cotizacion = cotizacionService.cotizar(solicitud(3, 2));
@@ -148,24 +140,13 @@ class CotizacionServiceTest {
         assertThrows(CotizacionInvalidaException.class, () -> cotizacionService.cotizar(mismoDia));
     }
 
+    // El motivo exacto (reserva activa o periodo bloqueado) ya no se
+    // distingue desde aqui: estaDisponible() se extrajo a DisponibilidadService
+    // (SCRUM-32), que es quien prueba cada causa por separado.
     @Test
-    void escenario4_periodoOcupadoNoGeneraTotal() {
+    void escenario4_periodoNoDisponibleNoGeneraTotal() {
         when(publicacionRepository.findById(1)).thenReturn(Optional.of(unaPublicacion(EstadoPublicacion.ACTIVA)));
-        when(disponibilidadRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
-                eq(3), anyCollection(), any(), any())).thenReturn(false);
-        when(reservaRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
-                eq(3), anyCollection(), any(), any())).thenReturn(true);
-
-        assertThrows(PeriodoNoDisponibleException.class, () -> cotizacionService.cotizar(solicitud(3, 2)));
-    }
-
-    @Test
-    void escenario4_periodoBloqueadoEnElCalendarioNoGeneraTotal() {
-        when(publicacionRepository.findById(1)).thenReturn(Optional.of(unaPublicacion(EstadoPublicacion.ACTIVA)));
-        when(disponibilidadRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
-                eq(3), anyCollection(), any(), any())).thenReturn(true);
-        when(reservaRepository.existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
-                eq(3), anyCollection(), any(), any())).thenReturn(false);
+        when(disponibilidadService.estaDisponible(eq(3), any(), any())).thenReturn(false);
 
         assertThrows(PeriodoNoDisponibleException.class, () -> cotizacionService.cotizar(solicitud(3, 2)));
     }

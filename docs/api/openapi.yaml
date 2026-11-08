@@ -861,6 +861,60 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/listings/{id}/availability:
+    get:
+      tags:
+      - Disponibilidad
+      summary: Consultar disponibilidad por fechas
+      description: "Indica si el rango está libre y diferencia los periodos disponibles,\
+        \ reservados y bloqueados."
+      operationId: consultar
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - name: from
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      responses:
+        "200":
+          description: Disponibilidad del rango y el detalle de periodos
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ConsultaDisponibilidadResponse"
+        "400":
+          description: La fecha de salida no es posterior a la de llegada
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La publicación no existe o ya no está disponible
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/listings/mine:
     get:
       tags:
@@ -1020,7 +1074,7 @@ paths:
       - Auditoría
       summary: Consultar eventos de auditoría
       description: Del más reciente al más antiguo. Todos los filtros son opcionales.
-      operationId: consultar
+      operationId: consultar_1
       parameters:
       - name: desde
         in: query
@@ -1661,6 +1715,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ResenaResponse"
+    ConsultaDisponibilidadResponse:
+      type: object
+      properties:
+        disponible:
+          type: boolean
+        periodos:
+          type: array
+          items:
+            $ref: "#/components/schemas/PeriodoDisponibilidadResponse"
+    PeriodoDisponibilidadResponse:
+      type: object
+      properties:
+        fechaInicio:
+          type: string
+          format: date
+        fechaFin:
+          type: string
+          format: date
+        estado:
+          type: string
     PublicacionResumenResponse:
       type: object
       properties:

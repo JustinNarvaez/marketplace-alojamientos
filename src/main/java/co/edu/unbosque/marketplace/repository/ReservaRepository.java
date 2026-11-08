@@ -29,4 +29,10 @@ public interface ReservaRepository extends JpaRepository<Reserva, Integer> {
 
     // SCRUM-53, reporte de demanda: solo las reservas que si se concretaron.
     List<Reserva> findByEstadoIn(Collection<EstadoReserva> estados);
+
+    // SCRUM-32: version "lista" del exists de arriba, para mostrar las
+    // reservas que se cruzan con [llegada, salida), no solo saber si hay alguna.
+    List<Reserva> findByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
+            Integer idAlojamiento, Collection<EstadoReserva> estados,
+            LocalDate salida, LocalDate llegada);
 }

@@ -1,13 +1,16 @@
 package co.edu.unbosque.marketplace.service;
 
+import co.edu.unbosque.marketplace.dto.ConsultaDisponibilidadResponse;
 import co.edu.unbosque.marketplace.dto.DisponibilidadResponse;
 import co.edu.unbosque.marketplace.dto.GuardarDisponibilidadRequest;
+import co.edu.unbosque.marketplace.dto.PeriodoDisponibilidadResponse;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
 import co.edu.unbosque.marketplace.exception.DisponibilidadInvalidaException;
 import co.edu.unbosque.marketplace.exception.DisponibilidadNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.NoEsPropietarioException;
 import co.edu.unbosque.marketplace.exception.PeriodoNoDisponibleException;
 import co.edu.unbosque.marketplace.exception.PeriodoSuperpuestoException;
+import co.edu.unbosque.marketplace.exception.PublicacionNoDisponibleException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.model.Alojamiento;
 import co.edu.unbosque.marketplace.model.Disponibilidad;
@@ -27,6 +30,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -47,12 +52,17 @@ public class DisponibilidadService {
     static final List<EstadoReserva> RESERVAS_ACTIVAS =
             List.of(EstadoReserva.CONFIRMADA, EstadoReserva.PENDIENTE_APROBACION);
 
-    // SCRUM-33: lo que impide confirmar una reserva. Una PENDIENTE de otro
-    // huesped no lo impide: la primera que se confirma se queda con las fechas
-    // y la otra fallara cuando intenten confirmarla.
+    // Un periodo no esta disponible si esta BLOQUEADO o ya RESERVADO. Lo usan
+    // estaDisponible() (SCRUM-32/36) y confirmarReservaYBloquear() (SCRUM-33):
+    // una PENDIENTE de otro huesped no lo impide, la primera que se confirma
+    // se queda con las fechas y la otra fallara cuando intenten confirmarla.
     static final List<EstadoDisponibilidad> PERIODOS_OCUPADOS =
             List.of(EstadoDisponibilidad.RESERVADO, EstadoDisponibilidad.BLOQUEADO);
     static final List<EstadoReserva> RESERVAS_CONFIRMADAS = List.of(EstadoReserva.CONFIRMADA);
+
+    // SCRUM-32: la unica reserva activa que todavia no tiene periodo RESERVADO
+    // en disponibilidad (confirmarReservaYBloquear lo crea recien al confirmar).
+    static final List<EstadoReserva> RESERVAS_PENDIENTES = List.of(EstadoReserva.PENDIENTE_APROBACION);
 
     // Restriccion EXCLUDE de V1: dos reservas CONFIRMADAS del mismo alojamiento no se cruzan.
     static final String RESTRICCION_SIN_SOLAPAMIENTO = "ex_reserva_sin_solapamiento";
@@ -164,6 +174,97 @@ public class DisponibilidadService {
                 .stream()
                 .map(DisponibilidadService::aResponse)
                 .toList();
+    }
+
+    // SCRUM-36: extraido de CotizacionService (ahi era privado y estaba
+    // duplicado); se reutiliza desde cotizacion y desde consultar().
+    public boolean estaDisponible(Integer idAlojamiento, LocalDate llegada, LocalDate salida) {
+        boolean calendarioOcupado = disponibilidadRepository
+                .existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaInicioBeforeAndFechaFinAfter(
+                        idAlojamiento, PERIODOS_OCUPADOS, salida, llegada);
+        boolean yaReservado = reservaRepository
+                .existsByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
+                        idAlojamiento, RESERVAS_ACTIVAS, salida, llegada);
+        return !calendarioOcupado && !yaReservado;
+    }
+
+    /**
+     * SCRUM-32. A diferencia de listar() (el calendario tal cual lo dejo el
+     * anfitrion), esto arma la vista del huesped: rellena lo que no esta
+     * marcado como DISPONIBLE (calendario abierto). Una reserva CONFIRMADA
+     * ya tiene su periodo RESERVADO en disponibilidad (SCRUM-33 lo crea al
+     * confirmar), asi que solo hace falta traer aparte las PENDIENTE_APROBACION
+     * -- no tienen periodo todavia, pero igual ocupan las fechas (ver
+     * estaDisponible) -- para no mostrar la misma reserva CONFIRMADA dos veces.
+     */
+    @Transactional(readOnly = true)
+    public ConsultaDisponibilidadResponse consultar(Integer idPublicacion, LocalDate from, LocalDate to) {
+        if (!to.isAfter(from)) {
+            throw new DisponibilidadInvalidaException("La fecha de salida debe ser posterior a la de llegada.");
+        }
+        Publicacion publicacion = publicacionRepository.findById(idPublicacion)
+                .orElseThrow(PublicacionNoEncontradaException::new);
+        if (!publicacion.esVisibleParaHuespedes()) {
+            throw new PublicacionNoDisponibleException();
+        }
+        Integer idAlojamiento = publicacion.getAlojamiento().getIdAlojamiento();
+
+        List<PeriodoDisponibilidadResponse> ocupados = new ArrayList<>();
+        for (Disponibilidad periodo : disponibilidadRepository
+                .findByAlojamiento_IdAlojamientoAndFechaInicioBeforeAndFechaFinAfterOrderByFechaInicio(
+                        idAlojamiento, to, from)) {
+            ocupados.add(new PeriodoDisponibilidadResponse(tarde(periodo.getFechaInicio(), from),
+                    temprano(periodo.getFechaFin(), to), periodo.getEstado().name()));
+        }
+        for (Reserva reserva : reservaRepository
+                .findByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
+                        idAlojamiento, RESERVAS_PENDIENTES, to, from)) {
+            ocupados.add(new PeriodoDisponibilidadResponse(tarde(reserva.getFechaLlegada(), from),
+                    temprano(reserva.getFechaSalida(), to), EstadoDisponibilidad.RESERVADO.name()));
+        }
+        ocupados.sort(Comparator.comparing(PeriodoDisponibilidadResponse::fechaInicio));
+
+        // Escenario 4: los huecos que ningun periodo cubre son DISPONIBLE
+        // (calendario abierto). agregar() fusiona con el anterior si es
+        // contiguo y del mismo estado (p. ej. un hueco DISPONIBLE pegado a
+        // un periodo DISPONIBLE explicito no deberia verse como dos).
+        List<PeriodoDisponibilidadResponse> periodos = new ArrayList<>();
+        LocalDate cursor = from;
+        for (PeriodoDisponibilidadResponse ocupado : ocupados) {
+            if (ocupado.fechaInicio().isAfter(cursor)) {
+                agregar(periodos, new PeriodoDisponibilidadResponse(cursor, ocupado.fechaInicio(),
+                        EstadoDisponibilidad.DISPONIBLE.name()));
+            }
+            agregar(periodos, ocupado);
+            if (ocupado.fechaFin().isAfter(cursor)) {
+                cursor = ocupado.fechaFin();
+            }
+        }
+        if (to.isAfter(cursor)) {
+            agregar(periodos, new PeriodoDisponibilidadResponse(cursor, to, EstadoDisponibilidad.DISPONIBLE.name()));
+        }
+
+        return new ConsultaDisponibilidadResponse(estaDisponible(idAlojamiento, from, to), periodos);
+    }
+
+    private static void agregar(List<PeriodoDisponibilidadResponse> periodos, PeriodoDisponibilidadResponse nuevo) {
+        if (!periodos.isEmpty()) {
+            PeriodoDisponibilidadResponse ultimo = periodos.get(periodos.size() - 1);
+            if (ultimo.estado().equals(nuevo.estado()) && ultimo.fechaFin().equals(nuevo.fechaInicio())) {
+                periodos.set(periodos.size() - 1,
+                        new PeriodoDisponibilidadResponse(ultimo.fechaInicio(), nuevo.fechaFin(), ultimo.estado()));
+                return;
+            }
+        }
+        periodos.add(nuevo);
+    }
+
+    private static LocalDate tarde(LocalDate a, LocalDate b) {
+        return a.isAfter(b) ? a : b;
+    }
+
+    private static LocalDate temprano(LocalDate a, LocalDate b) {
+        return a.isBefore(b) ? a : b;
     }
 
     // Escenario 1.
