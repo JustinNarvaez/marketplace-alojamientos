@@ -157,6 +157,14 @@ class ManejadorGlobalExcepcionesTest {
     }
 
     @Test
+    void notificacionNoEncontradaResponde404() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new NotificacionNoEncontradaException());
+
+        assertEquals(HttpStatus.NOT_FOUND, respuesta.getStatusCode());
+        assertEquals("La notificación no existe.", respuesta.getBody().mensaje());
+    }
+
+    @Test
     void periodoNoDisponibleResponde409() {
         ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new PeriodoNoDisponibleException());
 

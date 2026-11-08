@@ -33,6 +33,8 @@
 --   Habitacion en Chapinero     (Laura) ACTIVA     FLEXIBLE
 --   Apartamento en Bocagrande   (Laura) PAUSADA    MODERADA  (no se puede cotizar)
 --
+-- Notificaciones (SCRUM-45): Carlos tiene 3 (2 sin leer) y Mario 2 (1 sin leer).
+--
 -- No crea reservas ni pagos: dependen de SCRUM-38 y SCRUM-55. Cuando
 -- existan, se agregan aqui.
 -- =====================================================================
@@ -226,6 +228,31 @@ JOIN usuario u ON u.id_usuario = a.id_anfitrion
 CROSS JOIN (VALUES (10, 20, 'DISPONIBLE'), (20, 25, 'BLOQUEADO'), (25, 40, 'DISPONIBLE')) AS d(desde, hasta, estado)
 WHERE u.email = 'anfitrion@prueba.com' AND p.titulo = 'Apartamento en El Poblado'
   AND NOT EXISTS (SELECT 1 FROM disponibilidad x WHERE x.id_alojamiento = a.id_alojamiento);
+
+-- ---------------------------------------------------------------------
+-- Notificaciones (SCRUM-45) para probar el centro de notificaciones
+-- mientras SCRUM-44 no las genere solas. Carlos y Mario tienen leidas y
+-- sin leer; los demas no tienen ninguna (para ver "solo veo las mias").
+-- No se duplican: se busca por usuario y titulo.
+-- ---------------------------------------------------------------------
+INSERT INTO notificacion (id_usuario, tipo_evento, titulo, mensaje, leida, fecha_creacion)
+SELECT u.id_usuario, n.tipo, n.titulo, n.mensaje, n.leida, now() - n.hace
+FROM usuario u
+JOIN (VALUES
+    ('huesped@prueba.com',   'RESERVA',     'Bienvenido a la plataforma',
+     'Ya puedes buscar alojamientos y reservar.',                                          TRUE,  INTERVAL '3 days'),
+    ('huesped@prueba.com',   'RESERVA',     'Tu reserva está pendiente',
+     'El anfitrión de "Casa campestre en Guatape" debe aprobar tu solicitud.',             FALSE, INTERVAL '5 hours'),
+    ('huesped@prueba.com',   'RESERVA',     'Reserva confirmada',
+     'Tu reserva en "Apartamento en El Poblado" quedó confirmada. ¡Buen viaje!',           FALSE, INTERVAL '10 minutes'),
+    ('anfitrion@prueba.com', 'PUBLICACION', 'Publicación activada',
+     'Tu publicación "Casa campestre en Guatape" ya es visible para los huéspedes.',       TRUE,  INTERVAL '2 days'),
+    ('anfitrion@prueba.com', 'RESERVA',     'Nueva solicitud de reserva',
+     'Carlos quiere reservar "Casa campestre en Guatape". Revisa la solicitud.',           FALSE, INTERVAL '5 hours')
+) AS n(email, tipo, titulo, mensaje, leida, hace) ON n.email = u.email
+WHERE NOT EXISTS (
+    SELECT 1 FROM notificacion x WHERE x.id_usuario = u.id_usuario AND x.titulo = n.titulo
+);
 
 COMMIT;
 

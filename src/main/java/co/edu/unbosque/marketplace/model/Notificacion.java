@@ -43,6 +43,14 @@ public class Notificacion {
 
     protected Notificacion(){}
 
+    /**
+     * SCRUM-45: abrir o marcar una notificacion la deja leida. Marcar una
+     * que ya estaba leida no es error: el usuario pudo abrirla dos veces.
+     */
+    public void marcarComoLeida() {
+        leida = true;
+    }
+
     public Integer getIdNotificacion() {
         return idNotificacion;
     }
