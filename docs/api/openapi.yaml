@@ -27,6 +27,8 @@ tags:
   description: Calendario de disponibilidad del anfitrión (SCRUM-31).
 - name: Cotizaciones
   description: Cotización de una estancia con desglose de tarifas (SCRUM-36).
+- name: Notificaciones
+  description: Centro de notificaciones del usuario autenticado (SCRUM-45).
 paths:
   /api/users/me:
     get:
@@ -800,6 +802,41 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/notificaciones/{idNotificacion}/leida:
+    patch:
+      tags:
+      - Notificaciones
+      summary: Marcar una notificación como leída
+      description: Marcar una que ya estaba leída no es error.
+      operationId: marcarComoLeida
+      parameters:
+      - name: idNotificacion
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: Notificación marcada como leída
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/NotificacionResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No existe o es de otro usuario
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/listings/{id}/status:
     patch:
       tags:
@@ -855,6 +892,65 @@ paths:
         "409":
           description: "La publicación está BLOQUEADA, o se intenta pausar una que\
             \ no está ACTIVA"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/notificaciones:
+    get:
+      tags:
+      - Notificaciones
+      summary: Listar mis notificaciones
+      description: "De la más reciente a la más antigua, paginadas. Cada una dice\
+        \ si está leída."
+      operationId: listar_2
+      parameters:
+      - name: pagina
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: tamano
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 10
+      responses:
+        "200":
+          description: Página de notificaciones
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PaginaResponseNotificacionResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/notificaciones/no-leidas:
+    get:
+      tags:
+      - Notificaciones
+      summary: Contar mis notificaciones sin leer
+      operationId: contarNoLeidas
+      responses:
+        "200":
+          description: Cantidad de notificaciones sin leer
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ConteoNotificacionesResponse"
+        "401":
+          description: Falta el token o ya venció
           content:
             '*/*':
               schema:
@@ -978,7 +1074,7 @@ paths:
       tags:
       - Disponibilidad
       summary: Ver el calendario de una publicación propia
-      operationId: listar_2
+      operationId: listar_3
       parameters:
       - name: idPublicacion
         in: path
@@ -1643,6 +1739,28 @@ components:
       properties:
         estadoCuenta:
           type: string
+    NotificacionResponse:
+      type: object
+      properties:
+        idNotificacion:
+          type: integer
+          format: int32
+        tipoEvento:
+          type: string
+        titulo:
+          type: string
+        mensaje:
+          type: string
+        leida:
+          type: boolean
+        fechaCreacion:
+          type: string
+          format: date-time
+        referenciaTipo:
+          type: string
+        referenciaId:
+          type: integer
+          format: int32
     CambiarEstadoPublicacionRequest:
       type: object
       properties:
@@ -1677,6 +1795,31 @@ components:
           type: array
           items:
             type: string
+    PaginaResponseNotificacionResponse:
+      type: object
+      properties:
+        contenido:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificacionResponse"
+        pagina:
+          type: integer
+          format: int32
+        tamano:
+          type: integer
+          format: int32
+        totalElementos:
+          type: integer
+          format: int64
+        totalPaginas:
+          type: integer
+          format: int32
+    ConteoNotificacionesResponse:
+      type: object
+      properties:
+        noLeidas:
+          type: integer
+          format: int64
     DetalleAlojamientoResponse:
       type: object
       properties:

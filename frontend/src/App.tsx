@@ -10,6 +10,7 @@ import NoAutorizado from './paginas/NoAutorizado'
 import NoEncontrado from './paginas/NoEncontrado'
 import PaginaPendiente from './paginas/PaginaPendiente'
 import MiCuenta from './paginas/MiCuenta'
+import Notificaciones from './paginas/Notificaciones'
 import CrearPublicacion from './paginas/CrearPublicacion'
 import DetalleAlojamiento from './paginas/DetalleAlojamiento'
 import ServiciosAdicionales from './paginas/ServiciosAdicionales'
@@ -32,6 +33,7 @@ export default function App() {
 
                 <Route element={<RutaProtegida />}>
                     <Route path="mi-cuenta" element={<MiCuenta />} />
+                    <Route path="notificaciones" element={<Notificaciones />} />
                     <Route path="alojamientos/:idPublicacion" element={<DetalleAlojamiento />} />
                 </Route>
 

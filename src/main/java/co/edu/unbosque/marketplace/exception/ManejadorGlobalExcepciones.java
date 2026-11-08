@@ -64,6 +64,11 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(NotificacionNoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> manejar(NotificacionNoEncontradaException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(PeriodoNoDisponibleException.class)
     public ResponseEntity<ErrorResponse> manejar(PeriodoNoDisponibleException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
