@@ -2,6 +2,11 @@ package co.edu.unbosque.marketplace.service;
 
 import co.edu.unbosque.marketplace.dto.ActualizarPerfilRequest;
 import co.edu.unbosque.marketplace.dto.EstadoCuentaResponse;
+import co.edu.unbosque.marketplace.dto.PaginaResponse;
+import co.edu.unbosque.marketplace.dto.RestriccionUsuarioRequest;
+import co.edu.unbosque.marketplace.dto.UsuarioAdminResponse;
+import co.edu.unbosque.marketplace.exception.CambioEstadoCuentaInvalidoException;
+import co.edu.unbosque.marketplace.exception.UsuarioNoEncontradoException;
 import co.edu.unbosque.marketplace.dto.PerfilActualizadoResponse;
 import co.edu.unbosque.marketplace.dto.PerfilUsuarioResponse;
 import co.edu.unbosque.marketplace.exception.CorreoYaRegistradoException;
@@ -18,8 +23,13 @@ import co.edu.unbosque.marketplace.seguridad.ServicioJwt;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -32,6 +42,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /** Escenarios 1, 3 y 4 de SCRUM-26 (el 2 entra por AuthService.reactivar). */
@@ -177,5 +188,116 @@ class UsuarioServiceTest {
         verify(usuarioRepository, never()).save(any());
         verify(servicioAuditoria, never())
                 .registrarEnTransaccionActual(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    // ---- SCRUM-49: restringir usuario ----
+
+    private Usuario unAdministrador() {
+        Usuario admin = new Usuario("Carla", "Admin", "admin@ejemplo.com", "hash",
+                "3000000000", OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        admin.setIdUsuario(1);
+        return admin;
+    }
+
+    @Test
+    void restriccionEscenario1_restringeLaCuentaYAuditaConElMotivo() {
+        Usuario admin = unAdministrador();
+        Usuario usuario = unUsuario(EstadoCuenta.ACTIVA);
+        when(usuarioRepository.findByEmail("admin@ejemplo.com")).thenReturn(Optional.of(admin));
+        when(usuarioRepository.findById(7)).thenReturn(Optional.of(usuario));
+
+        UsuarioAdminResponse respuesta = usuarioService.cambiarRestriccion("admin@ejemplo.com", 7,
+                new RestriccionUsuarioRequest(true, "  Publicaciones engañosas  "), "127.0.0.1");
+
+        assertEquals("RESTRINGIDA", respuesta.estadoCuenta());
+        verify(usuarioRepository).save(usuario);
+        verify(servicioAuditoria).registrarAccionAdmin(admin, "usuario", 7, "RESTRICCION_USUARIO",
+                new ServicioAuditoria.CambioEstado("ACTIVA", "RESTRINGIDA"), "Publicaciones engañosas", "127.0.0.1");
+    }
+
+    @Test
+    void restriccionEscenario2_levantarLaRestriccionDevuelveElAccesoYAudita() {
+        Usuario admin = unAdministrador();
+        Usuario usuario = unUsuario(EstadoCuenta.RESTRINGIDA);
+        when(usuarioRepository.findByEmail("admin@ejemplo.com")).thenReturn(Optional.of(admin));
+        when(usuarioRepository.findById(7)).thenReturn(Optional.of(usuario));
+
+        UsuarioAdminResponse respuesta = usuarioService.cambiarRestriccion("admin@ejemplo.com", 7,
+                new RestriccionUsuarioRequest(false, "Apelación aceptada"), "127.0.0.1");
+
+        assertEquals("ACTIVA", respuesta.estadoCuenta());
+        verify(servicioAuditoria).registrarAccionAdmin(admin, "usuario", 7, "LEVANTAMIENTO_RESTRICCION_USUARIO",
+                new ServicioAuditoria.CambioEstado("RESTRINGIDA", "ACTIVA"), "Apelación aceptada", "127.0.0.1");
+    }
+
+    @Test
+    void restriccionDeUnUsuarioQueNoExisteResponde404() {
+        when(usuarioRepository.findByEmail("admin@ejemplo.com")).thenReturn(Optional.of(unAdministrador()));
+        when(usuarioRepository.findById(99)).thenReturn(Optional.empty());
+        RestriccionUsuarioRequest solicitud = new RestriccionUsuarioRequest(true, "Spam");
+
+        assertThrows(UsuarioNoEncontradoException.class, () -> usuarioService.cambiarRestriccion(
+                "admin@ejemplo.com", 99, solicitud, "127.0.0.1"));
+    }
+
+    @Test
+    void elAdministradorNoPuedeRestringirSuPropiaCuenta() {
+        Usuario admin = unAdministrador();
+        when(usuarioRepository.findByEmail("admin@ejemplo.com")).thenReturn(Optional.of(admin));
+        when(usuarioRepository.findById(1)).thenReturn(Optional.of(admin));
+        RestriccionUsuarioRequest solicitud = new RestriccionUsuarioRequest(true, "Prueba");
+
+        assertThrows(CambioEstadoCuentaInvalidoException.class, () -> usuarioService.cambiarRestriccion(
+                "admin@ejemplo.com", 1, solicitud, "127.0.0.1"));
+
+        assertEquals(EstadoCuenta.ACTIVA, admin.getEstadoCuenta());
+        verify(usuarioRepository, never()).save(any());
+        verifyNoInteractions(servicioAuditoria);
+    }
+
+    @Test
+    void restringirUnaCuentaYaRestringidaNoGuardaNiAudita() {
+        when(usuarioRepository.findByEmail("admin@ejemplo.com")).thenReturn(Optional.of(unAdministrador()));
+        when(usuarioRepository.findById(7)).thenReturn(Optional.of(unUsuario(EstadoCuenta.RESTRINGIDA)));
+        RestriccionUsuarioRequest solicitud = new RestriccionUsuarioRequest(true, "Otra vez");
+
+        assertThrows(CambioEstadoCuentaInvalidoException.class, () -> usuarioService.cambiarRestriccion(
+                "admin@ejemplo.com", 7, solicitud, "127.0.0.1"));
+
+        verify(usuarioRepository, never()).save(any());
+        verifyNoInteractions(servicioAuditoria);
+    }
+
+    @Test
+    void listarParaAdminBuscaPorElTextoYAcotaLaPagina() {
+        when(usuarioRepository
+                .findByEmailContainingIgnoreCaseOrNombreContainingIgnoreCaseOrApellidoContainingIgnoreCase(
+                        eq("ana"), eq("ana"), eq("ana"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(unUsuario(EstadoCuenta.ACTIVA)), PageRequest.of(0, 50), 1));
+
+        PaginaResponse<UsuarioAdminResponse> pagina = usuarioService.listarParaAdmin("  ana ", -1, 500);
+
+        ArgumentCaptor<Pageable> pedido = ArgumentCaptor.forClass(Pageable.class);
+        verify(usuarioRepository)
+                .findByEmailContainingIgnoreCaseOrNombreContainingIgnoreCaseOrApellidoContainingIgnoreCase(
+                        eq("ana"), eq("ana"), eq("ana"), pedido.capture());
+        assertEquals(0, pedido.getValue().getPageNumber());
+        assertEquals(50, pedido.getValue().getPageSize());
+        assertEquals(1, pagina.totalElementos());
+        UsuarioAdminResponse fila = pagina.contenido().getFirst();
+        assertEquals("ana@ejemplo.com", fila.correo());
+        assertEquals("ACTIVA", fila.estadoCuenta());
+    }
+
+    @Test
+    void listarParaAdminSinBusquedaTraeATodos() {
+        when(usuarioRepository
+                .findByEmailContainingIgnoreCaseOrNombreContainingIgnoreCaseOrApellidoContainingIgnoreCase(
+                        eq(""), eq(""), eq(""), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        PaginaResponse<UsuarioAdminResponse> pagina = usuarioService.listarParaAdmin(null, 0, 20);
+
+        assertEquals(0, pagina.totalElementos());
     }
 }

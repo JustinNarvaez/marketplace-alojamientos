@@ -27,6 +27,8 @@ tags:
   description: Calendario de disponibilidad del anfitrión (SCRUM-31).
 - name: Cotizaciones
   description: Cotización de una estancia con desglose de tarifas (SCRUM-36).
+- name: Administración de usuarios
+  description: Moderación de cuentas por el administrador (SCRUM-49).
 - name: Notificaciones
   description: Centro de notificaciones del usuario autenticado (SCRUM-45).
 paths:
@@ -898,6 +900,66 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/admin/usuarios/{idUsuario}/restriccion:
+    patch:
+      tags:
+      - Administración de usuarios
+      summary: Restringir o levantar la restricción de un usuario
+      description: Solo ADMINISTRADOR. Un usuario RESTRINGIDO no puede iniciar sesión.
+        Queda en auditoría con el motivo.
+      operationId: cambiarRestriccion
+      parameters:
+      - name: idUsuario
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestriccionUsuarioRequest"
+        required: true
+      responses:
+        "200":
+          description: Estado de la cuenta actualizado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UsuarioAdminResponse"
+        "400":
+          description: Falta el motivo o la decisión
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: El usuario autenticado no es ADMINISTRADOR
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: El usuario no existe
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "Ya estaba en ese estado, o es la propia cuenta del administrador"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/notificaciones:
     get:
       tags:
@@ -1105,6 +1167,54 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: La publicación no existe
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/admin/usuarios:
+    get:
+      tags:
+      - Administración de usuarios
+      summary: Listar usuarios
+      description: "Solo ADMINISTRADOR. Busca por correo, nombre o apellido."
+      operationId: listar_4
+      parameters:
+      - name: busqueda
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: pagina
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: tamano
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: Página de usuarios
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PaginaResponseUsuarioAdminResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: El usuario autenticado no es ADMINISTRADOR
           content:
             '*/*':
               schema:
@@ -1775,6 +1885,35 @@ components:
       properties:
         estado:
           type: string
+    RestriccionUsuarioRequest:
+      type: object
+      properties:
+        restringido:
+          type: boolean
+        motivo:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - motivo
+      - restringido
+    UsuarioAdminResponse:
+      type: object
+      properties:
+        idUsuario:
+          type: integer
+          format: int32
+        nombre:
+          type: string
+        apellido:
+          type: string
+        correo:
+          type: string
+        estadoCuenta:
+          type: string
+        fechaRegistro:
+          type: string
+          format: date-time
     PerfilUsuarioResponse:
       type: object
       properties:
@@ -1892,6 +2031,25 @@ components:
           type: number
         estado:
           type: string
+    PaginaResponseUsuarioAdminResponse:
+      type: object
+      properties:
+        contenido:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsuarioAdminResponse"
+        pagina:
+          type: integer
+          format: int32
+        tamano:
+          type: integer
+          format: int32
+        totalElementos:
+          type: integer
+          format: int64
+        totalPaginas:
+          type: integer
+          format: int32
     EventoAuditoriaResponse:
       type: object
       properties:

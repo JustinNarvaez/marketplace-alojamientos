@@ -14,8 +14,11 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Registra los eventos de negocio en log_auditoria y, desde SCRUM-57, los
@@ -32,9 +35,11 @@ public class ServicioAuditoria {
     public record CambioEstado(String anterior, String nuevo) {}
 
     private final LogAuditoriaRepository logAuditoriaRepository;
+    private final ObjectMapper objectMapper;
 
-    public ServicioAuditoria(LogAuditoriaRepository logAuditoriaRepository) {
+    public ServicioAuditoria(LogAuditoriaRepository logAuditoriaRepository, ObjectMapper objectMapper) {
         this.logAuditoriaRepository = logAuditoriaRepository;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -46,7 +51,7 @@ public class ServicioAuditoria {
     public void registrar(Usuario usuario, TipoEventoAuditoria tipoEvento, String entidadAfectada,
                            Integer idEntidadAfectada, String accion, ResultadoAuditoria resultado,
                            String ipOrigen) {
-        guardar(usuario, tipoEvento, entidadAfectada, idEntidadAfectada, accion, resultado, ipOrigen, null);
+        guardar(usuario, tipoEvento, entidadAfectada, idEntidadAfectada, accion, resultado, ipOrigen, null, null);
     }
 
     /**
@@ -62,7 +67,7 @@ public class ServicioAuditoria {
     public void registrarEnTransaccionActual(Usuario usuario, TipoEventoAuditoria tipoEvento, String entidadAfectada,
                                               Integer idEntidadAfectada, String accion, ResultadoAuditoria resultado,
                                               String ipOrigen) {
-        guardar(usuario, tipoEvento, entidadAfectada, idEntidadAfectada, accion, resultado, ipOrigen, null);
+        guardar(usuario, tipoEvento, entidadAfectada, idEntidadAfectada, accion, resultado, ipOrigen, null, null);
     }
 
     /**
@@ -75,15 +80,33 @@ public class ServicioAuditoria {
                                        Integer idEntidadAfectada, String accion, CambioEstado cambio,
                                        String ipOrigen) {
         guardar(usuario, tipoEvento, entidadAfectada, idEntidadAfectada, accion, ResultadoAuditoria.EXITO,
-                ipOrigen, cambio);
+                ipOrigen, cambio, null);
+    }
+
+    /**
+     * SCRUM-49, escenario 3 (y SCRUM-48/50): una accion de moderacion. Como
+     * registrarCambioEstado, pero ademas guarda el motivo en la columna
+     * detalle (JSONB) con el estado anterior y el nuevo. El administrador es
+     * el actor y la fecha la pone guardar(). El motivo no va al log de
+     * aplicacion: es texto libre y podria traer datos personales.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void registrarAccionAdmin(Usuario administrador, String entidadAfectada, Integer idEntidadAfectada,
+                                     String accion, CambioEstado cambio, String motivo, String ipOrigen) {
+        Map<String, String> detalle = new LinkedHashMap<>();
+        detalle.put("estadoAnterior", cambio.anterior());
+        detalle.put("estadoNuevo", cambio.nuevo());
+        detalle.put("motivo", motivo);
+        guardar(administrador, TipoEventoAuditoria.ACCION_ADMIN, entidadAfectada, idEntidadAfectada, accion,
+                ResultadoAuditoria.EXITO, ipOrigen, cambio, objectMapper.writeValueAsString(detalle));
     }
 
     private void guardar(Usuario usuario, TipoEventoAuditoria tipoEvento, String entidadAfectada,
                           Integer idEntidadAfectada, String accion, ResultadoAuditoria resultado, String ipOrigen,
-                          CambioEstado cambio) {
+                          CambioEstado cambio, String detalle) {
         LogAuditoria log = new LogAuditoria(
                 usuario, tipoEvento, entidadAfectada, idEntidadAfectada, accion, resultado,
-                null, ipOrigen, OffsetDateTime.now());
+                detalle, ipOrigen, OffsetDateTime.now());
         logAuditoriaRepository.save(log);
 
         Runnable emitir = () -> emitirLog(usuario, tipoEvento, entidadAfectada, idEntidadAfectada, accion,

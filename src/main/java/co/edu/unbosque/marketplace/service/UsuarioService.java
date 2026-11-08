@@ -2,11 +2,16 @@ package co.edu.unbosque.marketplace.service;
 
 import co.edu.unbosque.marketplace.dto.ActualizarPerfilRequest;
 import co.edu.unbosque.marketplace.dto.EstadoCuentaResponse;
+import co.edu.unbosque.marketplace.dto.PaginaResponse;
 import co.edu.unbosque.marketplace.dto.PerfilActualizadoResponse;
 import co.edu.unbosque.marketplace.dto.PerfilUsuarioResponse;
+import co.edu.unbosque.marketplace.dto.RestriccionUsuarioRequest;
+import co.edu.unbosque.marketplace.dto.UsuarioAdminResponse;
+import co.edu.unbosque.marketplace.exception.CambioEstadoCuentaInvalidoException;
 import co.edu.unbosque.marketplace.exception.CorreoYaRegistradoException;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
 import co.edu.unbosque.marketplace.exception.ReservasPendientesException;
+import co.edu.unbosque.marketplace.exception.UsuarioNoEncontradoException;
 import co.edu.unbosque.marketplace.model.Usuario;
 import co.edu.unbosque.marketplace.model.enums.EstadoCuenta;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
@@ -15,6 +20,10 @@ import co.edu.unbosque.marketplace.model.enums.TipoEventoAuditoria;
 import co.edu.unbosque.marketplace.repository.ReservaRepository;
 import co.edu.unbosque.marketplace.repository.UsuarioRepository;
 import co.edu.unbosque.marketplace.seguridad.ServicioJwt;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +35,7 @@ public class UsuarioService {
 
     private static final String ENTIDAD_USUARIO = "usuario";
     private static final String ACCION_ACTUALIZACION_PERFIL = "ACTUALIZACION_PERFIL";
+    private static final int TAMANO_MAXIMO = 50;
 
     private final UsuarioRepository usuarioRepository;
     private final ReservaRepository reservaRepository;
@@ -113,6 +123,59 @@ public class UsuarioService {
                 ENTIDAD_USUARIO, usuario.getIdUsuario(), accion,
                 new ServicioAuditoria.CambioEstado(estadoAnterior, usuario.getEstadoCuenta().name()), ipOrigen);
         return new EstadoCuentaResponse(usuario.getEstadoCuenta().name());
+    }
+
+    /**
+     * SCRUM-49: listado paginado para el administrador. La busqueda es por
+     * correo, nombre o apellido; vacia, trae a todos.
+     */
+    @Transactional(readOnly = true)
+    public PaginaResponse<UsuarioAdminResponse> listarParaAdmin(String busqueda, int pagina, int tamano) {
+        String texto = busqueda == null ? "" : busqueda.trim();
+        Pageable pedido = PageRequest.of(Math.max(pagina, 0), Math.clamp(tamano, 1, TAMANO_MAXIMO),
+                Sort.by(Sort.Direction.ASC, "idUsuario"));
+        Page<Usuario> usuarios = usuarioRepository
+                .findByEmailContainingIgnoreCaseOrNombreContainingIgnoreCaseOrApellidoContainingIgnoreCase(
+                        texto, texto, texto, pedido);
+        return new PaginaResponse<>(usuarios.getContent().stream().map(UsuarioService::aRespuestaAdmin).toList(),
+                usuarios.getNumber(), usuarios.getSize(), usuarios.getTotalElements(), usuarios.getTotalPages());
+    }
+
+    /**
+     * SCRUM-49. Restringe o levanta la restriccion de una cuenta. El login
+     * ya rechaza las cuentas que no estan ACTIVA (AuthService), asi que con
+     * cambiar el estado basta para el escenario 1. El administrador sale del
+     * token, nunca del cuerpo.
+     */
+    @Transactional
+    public UsuarioAdminResponse cambiarRestriccion(String correoAdmin, Integer idUsuario,
+                                                   RestriccionUsuarioRequest request, String ipOrigen) {
+        Usuario administrador = buscarPorCorreo(correoAdmin);
+        Usuario usuario = usuarioRepository.findById(idUsuario).orElseThrow(UsuarioNoEncontradoException::new);
+        if (usuario.getIdUsuario().equals(administrador.getIdUsuario())) {
+            throw new CambioEstadoCuentaInvalidoException("No puedes cambiar la restricción de tu propia cuenta.");
+        }
+
+        String estadoAnterior = usuario.getEstadoCuenta().name();
+        String accion;
+        if (Boolean.TRUE.equals(request.restringido())) {
+            usuario.restringir();
+            accion = "RESTRICCION_USUARIO";
+        } else {
+            usuario.levantarRestriccion();
+            accion = "LEVANTAMIENTO_RESTRICCION_USUARIO";
+        }
+        usuarioRepository.save(usuario);
+
+        servicioAuditoria.registrarAccionAdmin(administrador, ENTIDAD_USUARIO, usuario.getIdUsuario(), accion,
+                new ServicioAuditoria.CambioEstado(estadoAnterior, usuario.getEstadoCuenta().name()),
+                request.motivo().trim(), ipOrigen);
+        return aRespuestaAdmin(usuario);
+    }
+
+    private static UsuarioAdminResponse aRespuestaAdmin(Usuario usuario) {
+        return new UsuarioAdminResponse(usuario.getIdUsuario(), usuario.getNombre(), usuario.getApellido(),
+                usuario.getEmail(), usuario.getEstadoCuenta().name(), usuario.getFechaRegistro());
     }
 
     // Si no es anfitrion, la consulta simplemente no encuentra nada.
