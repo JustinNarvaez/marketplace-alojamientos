@@ -4,6 +4,7 @@ import co.edu.unbosque.marketplace.config.FiltroIdPeticion;
 import co.edu.unbosque.marketplace.dto.ErrorResponse;
 import co.edu.unbosque.marketplace.model.enums.EstadoCuenta;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
+import co.edu.unbosque.marketplace.model.enums.TipoAlojamiento;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
@@ -17,6 +18,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
 
@@ -247,6 +249,20 @@ class ManejadorGlobalExcepcionesTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, respuesta.getStatusCode());
         assertEquals("El servicio adicional \"Desayuno\" está repetido.", respuesta.getBody().mensaje());
+    }
+
+    // SCRUM-34, revision del PR #35: un @RequestParam que no convierte (un
+    // enum que no existe, un numero mal escrito) respondia 500 antes de este
+    // manejador.
+    @Test
+    void parametroMalFormadoResponde400ConElNombreDelParametro() {
+        MethodArgumentTypeMismatchException ex = new MethodArgumentTypeMismatchException(
+                "HOTEL", TipoAlojamiento.class, "tipo", null, null);
+
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(ex);
+
+        assertEquals(HttpStatus.BAD_REQUEST, respuesta.getStatusCode());
+        assertEquals("El parámetro 'tipo' no tiene un valor válido.", respuesta.getBody().mensaje());
     }
 
     @AfterEach

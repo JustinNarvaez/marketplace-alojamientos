@@ -57,6 +57,11 @@ public class SecurityConfig {
                 .sessionManagement(sesion -> sesion.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(autorizar -> autorizar
                         .requestMatchers("/api/auth/**").permitAll()
+                        // SCRUM-34: la busqueda es publica, igual que Inicio.tsx; el
+                        // catalogo de servicios tambien, para que el filtro de
+                        // servicios funcione sin sesion (es de solo lectura, sin dato sensible).
+                        .requestMatchers(HttpMethod.GET, "/api/listings/busqueda").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/servicios").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/servicios").hasRole("ADMINISTRADOR")
                         .requestMatchers(HttpMethod.POST, "/api/listings").hasRole("ANFITRION")
                         .requestMatchers(HttpMethod.PUT, "/api/listings/*/extras").hasRole("ANFITRION")

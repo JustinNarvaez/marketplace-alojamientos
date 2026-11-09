@@ -5,11 +5,15 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface PublicacionRepository extends JpaRepository<Publicacion, Integer> {
+// JpaSpecificationExecutor: permite consultas con filtros opcionales (SCRUM-34,
+// mismo patron que LogAuditoriaRepository de SCRUM-51).
+public interface PublicacionRepository extends JpaRepository<Publicacion, Integer>,
+        JpaSpecificationExecutor<Publicacion> {
 
     List<Publicacion> findByAlojamiento_Anfitrion_IdUsuarioOrderByFechaCreacionDesc(Integer idUsuario);
 

@@ -12,6 +12,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class ManejadorGlobalExcepciones {
@@ -86,6 +87,11 @@ public class ManejadorGlobalExcepciones {
 
     @ExceptionHandler(DisponibilidadInvalidaException.class)
     public ResponseEntity<ErrorResponse> manejar(DisponibilidadInvalidaException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(BusquedaInvalidaException.class)
+    public ResponseEntity<ErrorResponse> manejar(BusquedaInvalidaException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
     }
 
@@ -168,6 +174,16 @@ public class ManejadorGlobalExcepciones {
     public ResponseEntity<ErrorResponse> manejar(HttpMessageNotReadableException ex) {
         LOGGER.warn("Cuerpo de la peticion ilegible: {}", ex.getClass().getSimpleName());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(MENSAJE_DATOS_INVALIDOS));
+    }
+
+    // SCRUM-34, revision del PR #35: un @RequestParam que no convierte al tipo
+    // esperado (un enum que no existe, un numero mal escrito, una fecha con
+    // otro formato) caia en el manejador generico y respondia 500. Es un dato
+    // invalido del cliente, no un error del servidor.
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> manejar(MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("El parámetro '" + ex.getName() + "' no tiene un valor válido."));
     }
 
     /**
