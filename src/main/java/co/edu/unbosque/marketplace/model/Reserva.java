@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.model;
 
+import co.edu.unbosque.marketplace.exception.ReservaNoCancelableException;
 import co.edu.unbosque.marketplace.exception.ReservaNoConfirmableException;
 import co.edu.unbosque.marketplace.exception.ReservaNoResenableException;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
@@ -166,6 +167,22 @@ public class Reserva {
     public void validarQueSePuedeResenar(LocalDate hoy) {
         if (!terminoLaEstancia(hoy)) {
             throw new ReservaNoResenableException();
+        }
+    }
+
+    /**
+     * SCRUM-43, escenarios 1 y 4: solo una reserva CONFIRMADA se cancela.
+     * Una ya cancelada, completada (finalizada), rechazada o todavia
+     * pendiente de aprobacion responde 409.
+     */
+    public void cancelar() {
+        validarQueSePuedeCancelar();
+        estado = EstadoReserva.CANCELADA;
+    }
+
+    public void validarQueSePuedeCancelar() {
+        if (estado != EstadoReserva.CONFIRMADA) {
+            throw new ReservaNoCancelableException(estado);
         }
     }
 

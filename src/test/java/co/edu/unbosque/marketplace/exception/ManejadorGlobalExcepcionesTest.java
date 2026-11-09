@@ -345,10 +345,27 @@ class ManejadorGlobalExcepcionesTest {
     }
 
     @Test
+    void reservaNoCancelableResponde409() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(
+                new ReservaNoCancelableException(co.edu.unbosque.marketplace.model.enums.EstadoReserva.CANCELADA));
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals("Esta reserva no se puede cancelar: está cancelada.", respuesta.getBody().mensaje());
+    }
+
+    @Test
     void reservaNoEncontradaResponde404() {
         ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new ReservaNoEncontradaException());
 
         assertEquals(HttpStatus.NOT_FOUND, respuesta.getStatusCode());
         assertEquals("La reserva no existe.", respuesta.getBody().mensaje());
+    }
+
+    @Test
+    void cancelacionNoEncontradaResponde404() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new CancelacionNoEncontradaException());
+
+        assertEquals(HttpStatus.NOT_FOUND, respuesta.getStatusCode());
+        assertEquals("Esta reserva no tiene una cancelación registrada.", respuesta.getBody().mensaje());
     }
 }

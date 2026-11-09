@@ -3,6 +3,9 @@ package co.edu.unbosque.marketplace.model;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 
 @Entity
 @Table(name = "politica_cancelacion")
@@ -80,4 +83,32 @@ public class PoliticaCancelacion {
     public void setPorcentajeDevolucionTardia(BigDecimal porcentajeDevolucionTardia) {
         this.porcentajeDevolucionTardia = porcentajeDevolucionTardia;
     }
+
+    /**
+     * SCRUM-43: que porcentaje del total se devuelve si se cancela hoy.
+     * Las columnas se leen como explica V3:
+     * <ul>
+     *   <li>con al menos diasAntesReembolsoTotal dias de anticipacion: 100 %;</li>
+     *   <li>despues de ese plazo pero antes del dia de llegada: el parcial;</li>
+     *   <li>el dia de llegada o despues: el tardio.</li>
+     * </ul>
+     */
+    public BigDecimal porcentajeDevolucion(LocalDate llegada, LocalDate hoy) {
+        long diasAntes = ChronoUnit.DAYS.between(hoy, llegada);
+        if (diasAntes >= diasAntesReembolsoTotal) {
+            return CIEN;
+        }
+        if (diasAntes >= 1) {
+            return porcentajeDevolucionParcial;
+        }
+        return porcentajeDevolucionTardia;
+    }
+
+    // SCRUM-43: devolucion simulada, redondeada a centavos (NUMERIC(12,2)).
+    public BigDecimal calcularDevolucion(BigDecimal total, LocalDate llegada, LocalDate hoy) {
+        return total.multiply(porcentajeDevolucion(llegada, hoy))
+                .divide(CIEN, 2, RoundingMode.HALF_UP);
+    }
+
+    private static final BigDecimal CIEN = new BigDecimal("100");
 }

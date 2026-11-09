@@ -82,6 +82,10 @@ public class SecurityConfig {
                         // SCRUM-46: reseñar y ver las estancias por reseñar; solo el huesped.
                         .requestMatchers(HttpMethod.POST, "/api/reservas/*/resena").hasRole("HUESPED")
                         .requestMatchers(HttpMethod.GET, "/api/reservas/por-resenar").hasRole("HUESPED")
+                        // SCRUM-43: simular, cancelar y ver la cancelacion; solo el huesped
+                        // (que la reserva sea suya lo revisa CancelacionService).
+                        .requestMatchers("/api/reservas/*/cancelacion", "/api/reservas/*/cancelacion/**")
+                        .hasRole("HUESPED")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )
