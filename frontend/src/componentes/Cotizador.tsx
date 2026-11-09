@@ -36,6 +36,13 @@ interface Cotizacion {
     total: number
 }
 
+// Coincide con ReservaResponse del backend (SCRUM-38)
+interface Reserva {
+    idReserva: number
+    estado: string
+    total: number
+}
+
 const pesos = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
 
 function hoy(): string {
@@ -57,6 +64,11 @@ export default function Cotizador({ idPublicacion }: { idPublicacion: number }) 
     // SCRUM-37: extras que ofrece la publicacion y los que marco el huesped.
     const [extras, setExtras] = useState<ServicioAdicional[]>([])
     const [seleccionados, setSeleccionados] = useState<number[]>([])
+    // SCRUM-38: confirmar la reserva inmediata sobre la cotizacion vigente.
+    const [claveIdempotencia, setClaveIdempotencia] = useState('')
+    const [reserva, setReserva] = useState<Reserva | null>(null)
+    const [errorReserva, setErrorReserva] = useState<string | null>(null)
+    const [confirmando, setConfirmando] = useState(false)
 
     useEffect(() => {
         pedir<ServicioAdicional[]>(`/listings/${idPublicacion}/extras`)
@@ -85,6 +97,11 @@ export default function Cotizador({ idPublicacion }: { idPublicacion: number }) 
                 }),
             })
             setCotizacion(respuesta)
+            // SCRUM-38: una clave nueva por cada intento de reserva (cotizacion
+            // vigente); se reenvia igual si el huesped reintenta confirmar.
+            setClaveIdempotencia(crypto.randomUUID())
+            setReserva(null)
+            setErrorReserva(null)
         } catch (err) {
             // 409 = periodo no disponible (escenario 4): se muestra el mensaje y no hay total.
             setCotizacion(null)
@@ -93,6 +110,31 @@ export default function Cotizador({ idPublicacion }: { idPublicacion: number }) 
             setEnviando(false)
         }
     }, [idPublicacion, llegada, salida, huespedes])
+
+    // SCRUM-38, escenario 5: confirma la reserva inmediata sobre la cotizacion en pantalla.
+    const confirmarReserva = async () => {
+        setErrorReserva(null)
+        setConfirmando(true)
+        try {
+            const respuesta = await pedir<Reserva>('/reservas', {
+                method: 'POST',
+                body: JSON.stringify({
+                    idPublicacion,
+                    fechaLlegada: llegada,
+                    fechaSalida: salida,
+                    numeroHuespedes: Number(huespedes),
+                    idsServiciosAdicionales: seleccionados,
+                    claveIdempotencia,
+                }),
+            })
+            setReserva(respuesta)
+        } catch (err) {
+            // Motivo del rechazo (periodo ya no disponible, publicacion requiere aprobacion, etc.)
+            setErrorReserva(err instanceof ErrorApi ? err.message : 'Ocurrió un error. Intenta más tarde')
+        } finally {
+            setConfirmando(false)
+        }
+    }
 
     const cotizar = (evento: FormEvent) => {
         evento.preventDefault()
@@ -165,7 +207,7 @@ export default function Cotizador({ idPublicacion }: { idPublicacion: number }) 
 
             {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
 
-            {cotizacion && (
+            {cotizacion && !reserva && (
                 <Stack spacing={1} sx={{ mt: 3 }}>
                     {linea(`${pesos.format(cotizacion.precioNoche)} × ${cotizacion.noches} noches`, cotizacion.subtotalAlojamiento)}
                     {linea('Tarifa de limpieza', cotizacion.tarifaLimpieza)}
@@ -179,7 +221,18 @@ export default function Cotizador({ idPublicacion }: { idPublicacion: number }) 
                         <Typography variant="h6">Total</Typography>
                         <Typography variant="h6" color="secondary">{pesos.format(cotizacion.total)}</Typography>
                     </Stack>
+
+                    {errorReserva && <Alert severity="error">{errorReserva}</Alert>}
+                    <Button variant="contained" color="secondary" disabled={confirmando} onClick={confirmarReserva}>
+                        {confirmando ? 'Confirmando…' : 'Confirmar reserva'}
+                    </Button>
                 </Stack>
+            )}
+
+            {reserva && (
+                <Alert severity="success" sx={{ mt: 3 }}>
+                    Reserva #{reserva.idReserva} confirmada. Total: {pesos.format(reserva.total)}.
+                </Alert>
             )}
         </Box>
     )

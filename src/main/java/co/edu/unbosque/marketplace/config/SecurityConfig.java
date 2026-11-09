@@ -77,6 +77,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/listings/*/availability").hasRole("ANFITRION")
                         .requestMatchers(HttpMethod.PUT, "/api/listings/*/availability/*").hasRole("ANFITRION")
                         .requestMatchers(HttpMethod.DELETE, "/api/listings/*/availability/*").hasRole("ANFITRION")
+                        // SCRUM-38: solo un huesped puede confirmar su propia reserva.
+                        .requestMatchers(HttpMethod.POST, "/api/reservas").hasRole("HUESPED")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )
