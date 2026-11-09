@@ -210,6 +210,15 @@ class ManejadorGlobalExcepcionesTest {
     }
 
     @Test
+    void reservaRequiereAprobacionResponde409() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new ReservaRequiereAprobacionException());
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals("Esta publicación requiere aprobación del anfitrión antes de confirmar la reserva.",
+                respuesta.getBody().mensaje());
+    }
+
+    @Test
     void politicaCancelacionNoEncontradaResponde400() {
         ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new PoliticaCancelacionNoEncontradaException());
 

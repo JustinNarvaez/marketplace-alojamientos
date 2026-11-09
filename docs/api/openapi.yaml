@@ -29,6 +29,8 @@ tags:
   description: "Catálogo de servicios adicionales de un alojamiento (ej. WiFi, parqueadero)."
 - name: Publicaciones
   description: Publicaciones de alojamientos del anfitrión (SCRUM-27).
+- name: Reservas
+  description: Crear y confirmar una reserva inmediata (SCRUM-38).
 - name: Administración de publicaciones
   description: Moderación de publicaciones por el administrador (SCRUM-48).
 - name: Búsqueda
@@ -465,6 +467,55 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/reservas:
+    post:
+      tags:
+      - Reservas
+      summary: Crear una reserva inmediata
+      description: "Revalida fechas, capacidad y disponibilidad, y confirma la reserva\
+        \ de inmediato."
+      operationId: crear_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CrearReservaRequest"
+        required: true
+      responses:
+        "201":
+          description: Reserva confirmada
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReservaResponse"
+        "400":
+          description: "Datos inválidos, fechas inválidas, más huéspedes que la capacidad\
+            \ o publicación no activa"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La publicación no existe
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: El periodo ya no está disponible o la publicación requiere
+            aprobación del anfitrión
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/quotes:
     post:
       tags:
@@ -520,7 +571,7 @@ paths:
       summary: Crear una publicación
       description: "Solo un ANFITRION. La publicación queda en BORRADOR; si no se\
         \ elige política de cancelación, se usa FLEXIBLE."
-      operationId: crear_1
+      operationId: crear_2
       requestBody:
         content:
           application/json:
@@ -562,7 +613,7 @@ paths:
       summary: Agregar un periodo al calendario
       description: El anfitrión agrega periodos DISPONIBLE o BLOQUEADO; RESERVADO
         lo pone el sistema al reservar.
-      operationId: crear_2
+      operationId: crear_3
       parameters:
       - name: idPublicacion
         in: path
@@ -1950,6 +2001,81 @@ components:
           type: string
       required:
       - nombre
+    CrearReservaRequest:
+      type: object
+      properties:
+        idPublicacion:
+          type: integer
+          format: int32
+        fechaLlegada:
+          type: string
+          format: date
+        fechaSalida:
+          type: string
+          format: date
+        numeroHuespedes:
+          type: integer
+          format: int32
+          minimum: 1
+        idsServiciosAdicionales:
+          type: array
+          items:
+            type: integer
+            format: int32
+        claveIdempotencia:
+          type: string
+          maxLength: 80
+          minLength: 0
+      required:
+      - claveIdempotencia
+      - fechaLlegada
+      - fechaSalida
+      - idPublicacion
+      - numeroHuespedes
+    ReservaResponse:
+      type: object
+      properties:
+        idReserva:
+          type: integer
+          format: int32
+        estado:
+          type: string
+        idPublicacion:
+          type: integer
+          format: int32
+        fechaLlegada:
+          type: string
+          format: date
+        fechaSalida:
+          type: string
+          format: date
+        numeroHuespedes:
+          type: integer
+          format: int32
+        noches:
+          type: integer
+          format: int32
+        precioNoche:
+          type: number
+        subtotalAlojamiento:
+          type: number
+        tarifaLimpieza:
+          type: number
+        tarifaServicio:
+          type: number
+        serviciosAdicionales:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServicioAdicionalResponse"
+        totalServiciosAdicionales:
+          type: number
+        descuento:
+          type: number
+        total:
+          type: number
+        fechaCreacion:
+          type: string
+          format: date-time
     CotizacionRequest:
       type: object
       properties:

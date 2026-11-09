@@ -7,8 +7,16 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface ReservaRepository extends JpaRepository<Reserva, Integer> {
+
+    // SCRUM-38: replay de idempotencia. Si el huesped ya mando esta misma
+    // clave (doble clic, reintento de red), se devuelve la reserva que ya
+    // existe en vez de crear otra. Se restringe al propio huesped para no
+    // devolver una reserva ajena ante una colision de UUID (practicamente
+    // imposible, pero gratis de evitar).
+    Optional<Reserva> findByClaveIdempotenciaAndHuesped_IdUsuario(String claveIdempotencia, Integer idHuesped);
 
     // SCRUM-26, escenario 3: ¿el anfitrion tiene reservas en ese estado que
     // terminan despues de la fecha dada? Recorre reserva -> alojamiento -> anfitrion.

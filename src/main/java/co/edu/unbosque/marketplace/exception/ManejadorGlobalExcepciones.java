@@ -140,6 +140,11 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(ReservaRequiereAprobacionException.class)
+    public ResponseEntity<ErrorResponse> manejar(ReservaRequiereAprobacionException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(PoliticaCancelacionNoEncontradaException.class)
     public ResponseEntity<ErrorResponse> manejar(PoliticaCancelacionNoEncontradaException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
