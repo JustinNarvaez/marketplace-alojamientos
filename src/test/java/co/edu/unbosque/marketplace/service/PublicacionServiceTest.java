@@ -10,6 +10,7 @@ import co.edu.unbosque.marketplace.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
 import co.edu.unbosque.marketplace.exception.NoEsPropietarioException;
+import co.edu.unbosque.marketplace.exception.PoliticaCancelacionNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.PublicacionBloqueadaException;
 import co.edu.unbosque.marketplace.exception.PublicacionIncompletaException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoActivaException;
@@ -125,14 +126,14 @@ class PublicacionServiceTest {
                                                  List<String> imagenes) {
         return new CrearPublicacionRequest("Apartamento frente al mar", "Vista al mar y wifi",
                 TipoAlojamiento.APARTAMENTO, (short) 4, "Cartagena", "Cra 1 # 2-3", "Bocagrande",
-                new BigDecimal("320000.00"), null, null, idsServicios, reglas, imagenes);
+                new BigDecimal("320000.00"), null, null, idsServicios, reglas, imagenes, null);
     }
 
     private EditarPublicacionRequest unaEdicion(List<Integer> idsServicios, List<String> reglas,
                                                 List<String> imagenes, Boolean reservaInmediata) {
         return new EditarPublicacionRequest("Casa renovada", "Descripcion actualizada", TipoAlojamiento.CASA,
                 (short) 6, "Medellin", "Cra 10 # 20-30", "El Poblado", new BigDecimal("450000.00"),
-                new BigDecimal("50000.00"), reservaInmediata, idsServicios, reglas, imagenes);
+                new BigDecimal("50000.00"), reservaInmediata, idsServicios, reglas, imagenes, null);
     }
 
     private PoliticaCancelacion flexible() {
@@ -733,5 +734,113 @@ class PublicacionServiceTest {
                 publicacionService.listarParaAdmin(null, EstadoPublicacion.BLOQUEADA, 0, 20);
 
         assertEquals(0, pagina.totalElementos());
+    }
+
+    // ---- SCRUM-42: politica de cancelacion por publicacion ----
+
+    private PoliticaCancelacion estricta() {
+        PoliticaCancelacion politica = new PoliticaCancelacion("ESTRICTA", "Reembolso total hasta 14 dias antes",
+                (short) 14, new BigDecimal("50.00"), new BigDecimal("0.00"));
+        politica.setIdPolitica(3);
+        return politica;
+    }
+
+    private CrearPublicacionRequest unaSolicitudConPolitica(Integer idPolitica) {
+        return new CrearPublicacionRequest("Apartamento frente al mar", "Vista al mar y wifi",
+                TipoAlojamiento.APARTAMENTO, (short) 4, "Cartagena", "Cra 1 # 2-3", "Bocagrande",
+                new BigDecimal("320000.00"), null, null, null, null, null, idPolitica);
+    }
+
+    private EditarPublicacionRequest unaEdicionConPolitica(Integer idPolitica) {
+        return new EditarPublicacionRequest("Casa renovada", "Descripcion actualizada", TipoAlojamiento.CASA,
+                (short) 6, "Medellin", "Cra 10 # 20-30", "El Poblado", new BigDecimal("450000.00"),
+                null, null, null, null, null, idPolitica);
+    }
+
+    @Test
+    void politicaEscenario1_alCrearQuedaAsociadaLaPoliticaElegida() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        when(anfitrionRepository.findById(7)).thenReturn(Optional.of(new Anfitrion(usuario)));
+        when(politicaCancelacionRepository.findById(3)).thenReturn(Optional.of(estricta()));
+        prepararGuardado();
+
+        PublicacionResponse respuesta = publicacionService.crear("ana@ejemplo.com",
+                unaSolicitudConPolitica(3), "127.0.0.1");
+
+        assertEquals("ESTRICTA", respuesta.politicaCancelacion());
+        verify(politicaCancelacionRepository, never()).findByNombre(any());
+    }
+
+    @Test
+    void politicaAlCrearConUnaPoliticaInexistenteRechazaYNoGuardaNada() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        when(anfitrionRepository.findById(7)).thenReturn(Optional.of(new Anfitrion(usuario)));
+        when(politicaCancelacionRepository.findById(99)).thenReturn(Optional.empty());
+
+        assertThrows(PoliticaCancelacionNoEncontradaException.class, () -> publicacionService.crear(
+                "ana@ejemplo.com", unaSolicitudConPolitica(99), "127.0.0.1"));
+
+        verify(alojamientoRepository, never()).save(any());
+        verify(publicacionRepository, never()).save(any());
+    }
+
+    @Test
+    void politicaEscenario1_alEditarSeCambiaLaPolitica() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(adminRepository.existsById(7)).thenReturn(false);
+        when(politicaCancelacionRepository.findById(3)).thenReturn(Optional.of(estricta()));
+        prepararGuardadoDeEdicion();
+
+        PublicacionResponse respuesta = publicacionService.editar("ana@ejemplo.com", 1,
+                unaEdicionConPolitica(3), "127.0.0.1");
+
+        assertEquals("ESTRICTA", respuesta.politicaCancelacion());
+    }
+
+    @Test
+    void politicaAlEditarSinPoliticaSeConservaLaActual() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(adminRepository.existsById(7)).thenReturn(false);
+        prepararGuardadoDeEdicion();
+
+        PublicacionResponse respuesta = publicacionService.editar("ana@ejemplo.com", 1,
+                unaEdicionConPolitica(null), "127.0.0.1");
+
+        assertEquals("FLEXIBLE", respuesta.politicaCancelacion());
+        verify(politicaCancelacionRepository, never()).findById(any());
+    }
+
+    @Test
+    void politicaAlEditarConUnaPoliticaInexistenteNoGuarda() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(adminRepository.existsById(7)).thenReturn(false);
+        when(politicaCancelacionRepository.findById(99)).thenReturn(Optional.empty());
+
+        assertThrows(PoliticaCancelacionNoEncontradaException.class, () -> publicacionService.editar(
+                "ana@ejemplo.com", 1, unaEdicionConPolitica(99), "127.0.0.1"));
+
+        verify(publicacionRepository, never()).save(any());
+    }
+
+    @Test
+    void politicaEscenario3_sinPoliticaNoSePuedeActivar() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        publicacion.setEstado(EstadoPublicacion.BORRADOR);
+        publicacion.setPoliticaCancelacion(null);
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+
+        PublicacionIncompletaException error = assertThrows(PublicacionIncompletaException.class,
+                () -> publicacionService.cambiarEstado("ana@ejemplo.com", 1, EstadoPublicacion.ACTIVA, "127.0.0.1"));
+
+        assertEquals("No puedes activarla: elige una política de cancelación.", error.getMessage());
+        assertEquals(EstadoPublicacion.BORRADOR, publicacion.getEstado());
+        verify(publicacionRepository, never()).save(any());
     }
 }

@@ -124,6 +124,11 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(PoliticaCancelacionNoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> manejar(PoliticaCancelacionNoEncontradaException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(PublicacionIncompletaException.class)
     public ResponseEntity<ErrorResponse> manejar(PublicacionIncompletaException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));

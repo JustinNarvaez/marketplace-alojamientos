@@ -64,5 +64,8 @@ public record CrearPublicacionRequest(
 
         // Referencias (rutas o URL) de las imagenes; la primera es la portada.
         List<@NotBlank(message = "Una imagen no puede estar vacía.")
-             @Size(max = 500, message = "Cada referencia de imagen admite máximo 500 caracteres.") String> imagenes
+             @Size(max = 500, message = "Cada referencia de imagen admite máximo 500 caracteres.") String> imagenes,
+
+        // SCRUM-42: si llega nulo se usa la politica FLEXIBLE.
+        Integer idPoliticaCancelacion
 ) {}
