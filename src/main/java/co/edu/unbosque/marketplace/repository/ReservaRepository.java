@@ -21,6 +21,10 @@ public interface ReservaRepository extends JpaRepository<Reserva, Integer> {
     // SCRUM-43: la reserva solo si es del huesped de la sesion (si no, 404).
     Optional<Reserva> findByIdReservaAndHuesped_IdUsuario(Integer idReserva, Integer idHuesped);
 
+    // SCRUM-46: las estancias del huesped en esa publicacion que ya salieron.
+    List<Reserva> findByHuesped_IdUsuarioAndPublicacion_IdPublicacionAndEstadoInAndFechaSalidaLessThanEqualOrderByFechaSalidaDesc(
+            Integer idHuesped, Integer idPublicacion, Collection<EstadoReserva> estados, LocalDate hoy);
+
     // SCRUM-26, escenario 3: ¿el anfitrion tiene reservas en ese estado que
     // terminan despues de la fecha dada? Recorre reserva -> alojamiento -> anfitrion.
     boolean existsByAlojamiento_Anfitrion_IdUsuarioAndEstadoAndFechaSalidaAfter(

@@ -2,6 +2,7 @@ package co.edu.unbosque.marketplace.model;
 
 import co.edu.unbosque.marketplace.exception.ReservaNoCancelableException;
 import co.edu.unbosque.marketplace.exception.ReservaNoConfirmableException;
+import co.edu.unbosque.marketplace.exception.ReservaNoResenableException;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
 import org.junit.jupiter.api.Test;
 
@@ -10,7 +11,10 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 // SCRUM-33: solo una reserva pendiente se confirma.
 class ReservaTest {
@@ -41,6 +45,29 @@ class ReservaTest {
 
             assertThrows(ReservaNoConfirmableException.class, reserva::confirmar, estado.name());
             assertEquals(estado, reserva.getEstado(), estado.name());
+        }
+    }
+
+    // SCRUM-46: la reserva de prueba sale el 2026-12-05.
+    @Test
+    void laEstanciaTerminaSiEstaCompletadaOSiConfirmadaYaSalio() {
+        LocalDate salida = LocalDate.of(2026, 12, 5);
+
+        assertTrue(unaReserva(EstadoReserva.COMPLETADA).terminoLaEstancia(salida.minusDays(10)));
+        assertTrue(unaReserva(EstadoReserva.CONFIRMADA).terminoLaEstancia(salida));
+        assertFalse(unaReserva(EstadoReserva.CONFIRMADA).terminoLaEstancia(salida.minusDays(1)));
+        assertDoesNotThrow(() -> unaReserva(EstadoReserva.CONFIRMADA).validarQueSePuedeResenar(salida.plusDays(1)));
+    }
+
+    @Test
+    void canceladaRechazadaOPendienteNuncaSeResenan() {
+        LocalDate despues = LocalDate.of(2027, 1, 1);
+        for (EstadoReserva estado : new EstadoReserva[]{EstadoReserva.CANCELADA, EstadoReserva.RECHAZADA,
+                EstadoReserva.PENDIENTE_APROBACION}) {
+            Reserva reserva = unaReserva(estado);
+
+            assertThrows(ReservaNoResenableException.class, () -> reserva.validarQueSePuedeResenar(despues),
+                    estado.name());
         }
     }
 

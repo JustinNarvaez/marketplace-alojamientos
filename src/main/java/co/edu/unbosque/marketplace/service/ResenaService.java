@@ -1,6 +1,8 @@
 package co.edu.unbosque.marketplace.service;
 
+import co.edu.unbosque.marketplace.dto.CrearResenaRequest;
 import co.edu.unbosque.marketplace.dto.ResenaResponse;
+import co.edu.unbosque.marketplace.dto.ReservaPorResenarResponse;
 import co.edu.unbosque.marketplace.dto.ResumenResenasResponse;
 import co.edu.unbosque.marketplace.model.Resena;
 import co.edu.unbosque.marketplace.repository.ResenaRepository;
@@ -8,8 +10,15 @@ import co.edu.unbosque.marketplace.dto.PaginaResponse;
 import co.edu.unbosque.marketplace.dto.ResenaAdminResponse;
 import co.edu.unbosque.marketplace.dto.VisibilidadResenaRequest;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
+import co.edu.unbosque.marketplace.exception.ResenaDuplicadaException;
 import co.edu.unbosque.marketplace.exception.ResenaNoEncontradaException;
+import co.edu.unbosque.marketplace.exception.ReservaNoEncontradaException;
 import co.edu.unbosque.marketplace.model.Publicacion;
+import co.edu.unbosque.marketplace.model.Reserva;
+import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
+import co.edu.unbosque.marketplace.model.enums.ResultadoAuditoria;
+import co.edu.unbosque.marketplace.model.enums.TipoEventoAuditoria;
+import co.edu.unbosque.marketplace.repository.ReservaRepository;
 import co.edu.unbosque.marketplace.model.Usuario;
 import co.edu.unbosque.marketplace.repository.UsuarioRepository;
 import org.springframework.data.domain.Page;
@@ -21,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 /** Resenas de las publicaciones. SCRUM-35: lo que ve el huesped en el detalle. */
@@ -35,12 +46,60 @@ public class ResenaService {
 
     private final UsuarioRepository usuarioRepository;
     private final ServicioAuditoria servicioAuditoria;
+    private final ReservaRepository reservaRepository;
+
+    // SCRUM-46: estados en los que la estancia pudo haber terminado (ver Reserva.terminoLaEstancia).
+    private static final List<EstadoReserva> ESTADOS_RESENABLES =
+            List.of(EstadoReserva.CONFIRMADA, EstadoReserva.COMPLETADA);
 
     public ResenaService(ResenaRepository resenaRepository, UsuarioRepository usuarioRepository,
-                         ServicioAuditoria servicioAuditoria) {
+                         ServicioAuditoria servicioAuditoria, ReservaRepository reservaRepository) {
         this.resenaRepository = resenaRepository;
         this.usuarioRepository = usuarioRepository;
         this.servicioAuditoria = servicioAuditoria;
+        this.reservaRepository = reservaRepository;
+    }
+
+    /**
+     * SCRUM-46. Escenario 1: guarda la resena de la reserva; desde ella se
+     * llega al huesped, al alojamiento y a la publicacion, y lleva la fecha.
+     * Escenario 2: una reserva ajena responde 404 y una estancia que no ha
+     * terminado, 409. Escenario 3: una segunda resena de la misma reserva, 409.
+     * Escenario 4: evento RESENA en auditoria (con su log estructurado).
+     */
+    @Transactional
+    public ResenaResponse crear(String correo, Integer idReserva, CrearResenaRequest request, String ipOrigen) {
+        Usuario usuario = usuarioRepository.findByEmail(correo).orElseThrow(CredencialesInvalidasException::new);
+        Reserva reserva = reservaRepository.findByIdReservaAndHuesped_IdUsuario(idReserva, usuario.getIdUsuario())
+                .orElseThrow(ReservaNoEncontradaException::new);
+        reserva.validarQueSePuedeResenar(LocalDate.now());
+        if (resenaRepository.existsByReserva_IdReserva(idReserva)) {
+            throw new ResenaDuplicadaException();
+        }
+
+        String comentario = request.comentario() == null || request.comentario().isBlank()
+                ? null : request.comentario().trim();
+        Resena resena = resenaRepository.save(new Resena(reserva, request.calificacion(), comentario,
+                OffsetDateTime.now(), false));
+        servicioAuditoria.registrarEnTransaccionActual(usuario, TipoEventoAuditoria.RESENA, "resena",
+                resena.getIdResena(), "CREAR_RESENA", ResultadoAuditoria.EXITO, ipOrigen);
+        return aResponse(resena);
+    }
+
+    /** SCRUM-46: las estancias terminadas del huesped en esa publicacion que aun no tienen resena. */
+    @Transactional(readOnly = true)
+    public List<ReservaPorResenarResponse> pendientesDeResena(String correo, Integer idPublicacion) {
+        Usuario usuario = usuarioRepository.findByEmail(correo).orElseThrow(CredencialesInvalidasException::new);
+        LocalDate hoy = LocalDate.now();
+        return reservaRepository
+                .findByHuesped_IdUsuarioAndPublicacion_IdPublicacionAndEstadoInAndFechaSalidaLessThanEqualOrderByFechaSalidaDesc(
+                        usuario.getIdUsuario(), idPublicacion, ESTADOS_RESENABLES, hoy)
+                .stream()
+                .filter(reserva -> reserva.terminoLaEstancia(hoy))
+                .filter(reserva -> !resenaRepository.existsByReserva_IdReserva(reserva.getIdReserva()))
+                .map(reserva -> new ReservaPorResenarResponse(reserva.getIdReserva(), reserva.getFechaLlegada(),
+                        reserva.getFechaSalida()))
+                .toList();
     }
 
     /**

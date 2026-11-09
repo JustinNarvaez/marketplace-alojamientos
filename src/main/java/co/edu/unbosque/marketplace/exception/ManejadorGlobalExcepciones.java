@@ -75,6 +75,16 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(ReservaNoResenableException.class)
+    public ResponseEntity<ErrorResponse> manejar(ReservaNoResenableException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(ResenaDuplicadaException.class)
+    public ResponseEntity<ErrorResponse> manejar(ResenaDuplicadaException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(ReservaNoCancelableException.class)
     public ResponseEntity<ErrorResponse> manejar(ReservaNoCancelableException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));

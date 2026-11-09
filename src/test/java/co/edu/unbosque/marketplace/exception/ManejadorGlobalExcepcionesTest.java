@@ -329,6 +329,22 @@ class ManejadorGlobalExcepcionesTest {
     }
 
     @Test
+    void reservaNoResenableResponde409() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new ReservaNoResenableException());
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals("Solo puedes reseñar una estancia que ya terminó.", respuesta.getBody().mensaje());
+    }
+
+    @Test
+    void resenaDuplicadaResponde409() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new ResenaDuplicadaException());
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals("Ya reseñaste esta estancia.", respuesta.getBody().mensaje());
+    }
+
+    @Test
     void reservaNoCancelableResponde409() {
         ResponseEntity<ErrorResponse> respuesta = manejador.manejar(
                 new ReservaNoCancelableException(co.edu.unbosque.marketplace.model.enums.EstadoReserva.CANCELADA));
