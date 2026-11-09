@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.model;
 
+import co.edu.unbosque.marketplace.exception.ReservaNoCancelableException;
 import co.edu.unbosque.marketplace.exception.ReservaNoConfirmableException;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,30 @@ class ReservaTest {
             Reserva reserva = unaReserva(estado);
 
             assertThrows(ReservaNoConfirmableException.class, reserva::confirmar, estado.name());
+            assertEquals(estado, reserva.getEstado(), estado.name());
+        }
+    }
+
+    // SCRUM-43, escenario 1
+    @Test
+    void unaReservaConfirmadaSeCancela() {
+        Reserva reserva = unaReserva(EstadoReserva.CONFIRMADA);
+
+        reserva.cancelar();
+
+        assertEquals(EstadoReserva.CANCELADA, reserva.getEstado());
+    }
+
+    // SCRUM-43, escenario 4: ya cancelada, completada, rechazada o pendiente.
+    @Test
+    void ningunOtroEstadoSePuedeCancelar() {
+        for (EstadoReserva estado : EstadoReserva.values()) {
+            if (estado == EstadoReserva.CONFIRMADA) {
+                continue;
+            }
+            Reserva reserva = unaReserva(estado);
+
+            assertThrows(ReservaNoCancelableException.class, reserva::cancelar, estado.name());
             assertEquals(estado, reserva.getEstado(), estado.name());
         }
     }

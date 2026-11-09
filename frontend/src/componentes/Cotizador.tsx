@@ -13,6 +13,7 @@ import {
     TextField,
     Typography,
 } from '@mui/material'
+import { Link as RouterLink } from 'react-router-dom'
 import { pedir, ErrorApi } from '../api/cliente'
 
 // Coincide con ServicioAdicionalResponse del backend
@@ -230,7 +231,14 @@ export default function Cotizador({ idPublicacion }: { idPublicacion: number }) 
             )}
 
             {reserva && (
-                <Alert severity="success" sx={{ mt: 3 }}>
+                <Alert severity="success" sx={{ mt: 3 }}
+                       action={
+                           // SCRUM-43: mientras no exista "Mis reservas" (SCRUM-40), se cancela desde aqui.
+                           <Button color="inherit" size="small" component={RouterLink}
+                                   to={`/mis-reservas/${reserva.idReserva}/cancelar`}>
+                               Cancelar
+                           </Button>
+                       }>
                     Reserva #{reserva.idReserva} confirmada. Total: {pesos.format(reserva.total)}.
                 </Alert>
             )}

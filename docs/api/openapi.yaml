@@ -39,6 +39,8 @@ tags:
   description: Calendario de disponibilidad del anfitrión (SCRUM-31).
 - name: Administración de usuarios
   description: Moderación de cuentas por el administrador (SCRUM-49).
+- name: Cancelaciones
+  description: Cancelar una reserva con devolución simulada (SCRUM-43).
 - name: Notificaciones
   description: Centro de notificaciones del usuario autenticado (SCRUM-45).
 paths:
@@ -510,6 +512,81 @@ paths:
         "409":
           description: El periodo ya no está disponible o la publicación requiere
             aprobación del anfitrión
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/reservas/{idReserva}/cancelacion:
+    get:
+      tags:
+      - Cancelaciones
+      summary: Detalle de la cancelación
+      description: "Usuario, fecha, motivo, valor de devolución y estado final."
+      operationId: consultar
+      parameters:
+      - name: idReserva
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: Cancelación registrada
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CancelacionResponse"
+        "404":
+          description: "La reserva no existe, no es tuya o no está cancelada"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Cancelaciones
+      summary: Cancelar la reserva
+      description: "Aplica la política, libera las fechas y deja la reserva CANCELADA."
+      operationId: cancelar
+      parameters:
+      - name: idReserva
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelarReservaRequest"
+        required: true
+      responses:
+        "201":
+          description: Reserva cancelada
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CancelacionResponse"
+        "400":
+          description: Falta el motivo o es muy largo
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La reserva no existe o no es tuya
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "La reserva ya está cancelada, finalizada o no confirmada"
           content:
             '*/*':
               schema:
@@ -1140,6 +1217,42 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/reservas/{idReserva}/cancelacion/simulacion:
+    get:
+      tags:
+      - Cancelaciones
+      summary: Simular la cancelación
+      description: "Cuánto se devolvería si la reserva se cancela hoy, según la polí\
+        tica de la publicación. No cancela nada."
+      operationId: simular
+      parameters:
+      - name: idReserva
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: Devolución simulada
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SimulacionCancelacionResponse"
+        "404":
+          description: La reserva no existe o no es tuya
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: La reserva no está CONFIRMADA
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/politicas-cancelacion:
     get:
       tags:
@@ -1230,7 +1343,7 @@ paths:
       summary: Consultar disponibilidad por fechas
       description: "Indica si el rango está libre y diferencia los periodos disponibles,\
         \ reservados y bloqueados."
-      operationId: consultar
+      operationId: consultar_1
       parameters:
       - name: id
         in: path
@@ -1668,7 +1781,7 @@ paths:
       - Auditoría
       summary: Consultar eventos de auditoría
       description: Del más reciente al más antiguo. Todos los filtros son opcionales.
-      operationId: consultar_1
+      operationId: consultar_2
       parameters:
       - name: desde
         in: query
@@ -2076,6 +2189,35 @@ components:
         fechaCreacion:
           type: string
           format: date-time
+    CancelarReservaRequest:
+      type: object
+      properties:
+        motivo:
+          type: string
+          maxLength: 255
+          minLength: 0
+      required:
+      - motivo
+    CancelacionResponse:
+      type: object
+      properties:
+        idCancelacion:
+          type: integer
+          format: int32
+        idReserva:
+          type: integer
+          format: int32
+        canceladaPor:
+          type: string
+        fechaCancelacion:
+          type: string
+          format: date-time
+        motivo:
+          type: string
+        valorDevolucion:
+          type: number
+        estadoFinal:
+          type: string
     CotizacionRequest:
       type: object
       properties:
@@ -2469,6 +2611,32 @@ components:
           type: array
           items:
             type: string
+    SimulacionCancelacionResponse:
+      type: object
+      properties:
+        idReserva:
+          type: integer
+          format: int32
+        tituloPublicacion:
+          type: string
+        fechaLlegada:
+          type: string
+          format: date
+        fechaSalida:
+          type: string
+          format: date
+        estado:
+          type: string
+        politica:
+          type: string
+        descripcionPolitica:
+          type: string
+        total:
+          type: number
+        porcentajeDevolucion:
+          type: number
+        valorDevolucion:
+          type: number
     PoliticaCancelacionResponse:
       type: object
       properties:
