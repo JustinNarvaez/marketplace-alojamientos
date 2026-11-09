@@ -368,4 +368,24 @@ class ManejadorGlobalExcepcionesTest {
         assertEquals(HttpStatus.NOT_FOUND, respuesta.getStatusCode());
         assertEquals("Esta reserva no tiene una cancelación registrada.", respuesta.getBody().mensaje());
     }
+
+    // SCRUM-39
+    @Test
+    void claveIdempotenciaInvalidaResponde400() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(
+                new ClaveIdempotenciaInvalidaException("Falta la clave de idempotencia: envíala en el header Idempotency-Key."));
+
+        assertEquals(HttpStatus.BAD_REQUEST, respuesta.getStatusCode());
+        assertEquals("Falta la clave de idempotencia: envíala en el header Idempotency-Key.",
+                respuesta.getBody().mensaje());
+    }
+
+    @Test
+    void claveIdempotenciaReutilizadaResponde409() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new ClaveIdempotenciaReutilizadaException());
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals("Esta clave de idempotencia ya se usó para otra reserva. Vuelve a cotizar e intenta de nuevo.",
+                respuesta.getBody().mensaje());
+    }
 }
