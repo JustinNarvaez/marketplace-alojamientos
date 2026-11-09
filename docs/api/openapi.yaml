@@ -25,6 +25,8 @@ tags:
   description: Moderación de reseñas por el administrador (SCRUM-50).
 - name: Auditoría
   description: "Eventos de log_auditoria, solo para ADMINISTRADOR (SCRUM-51)."
+- name: Reseñas
+  description: Reseñar una estancia terminada (SCRUM-46).
 - name: Servicios
   description: "Catálogo de servicios adicionales de un alojamiento (ej. WiFi, parqueadero)."
 - name: Publicaciones
@@ -516,6 +518,53 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/reservas/{idReserva}/resena:
+    post:
+      tags:
+      - Reseñas
+      summary: Reseñar una estancia
+      description: Calificación de 1 a 5 y comentario opcional.
+      operationId: crear_2
+      parameters:
+      - name: idReserva
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CrearResenaRequest"
+        required: true
+      responses:
+        "201":
+          description: Reseña creada
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResenaResponse"
+        "400":
+          description: Calificación fuera de 1 a 5 o comentario muy largo
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La reserva no existe o no es tuya
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: La estancia no ha terminado o ya la reseñaste
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/quotes:
     post:
       tags:
@@ -571,7 +620,7 @@ paths:
       summary: Crear una publicación
       description: "Solo un ANFITRION. La publicación queda en BORRADOR; si no se\
         \ elige política de cancelación, se usa FLEXIBLE."
-      operationId: crear_2
+      operationId: crear_3
       requestBody:
         content:
           application/json:
@@ -613,7 +662,7 @@ paths:
       summary: Agregar un periodo al calendario
       description: El anfitrión agrega periodos DISPONIBLE o BLOQUEADO; RESERVADO
         lo pone el sistema al reservar.
-      operationId: crear_3
+      operationId: crear_4
       parameters:
       - name: idPublicacion
         in: path
@@ -1138,6 +1187,32 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/reservas/por-resenar:
+    get:
+      tags:
+      - Reseñas
+      summary: Estancias por reseñar
+      description: Las estancias terminadas del huésped en esa publicación que todavía
+        no tienen reseña.
+      operationId: porResenar
+      parameters:
+      - name: idPublicacion
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReservaPorResenarResponse"
       security:
       - bearerAuth: []
   /api/politicas-cancelacion:
@@ -2076,6 +2151,35 @@ components:
         fechaCreacion:
           type: string
           format: date-time
+    CrearResenaRequest:
+      type: object
+      properties:
+        calificacion:
+          type: integer
+          format: int32
+          maximum: 5
+          minimum: 1
+        comentario:
+          type: string
+          maxLength: 1000
+          minLength: 0
+      required:
+      - calificacion
+    ResenaResponse:
+      type: object
+      properties:
+        calificacion:
+          type: integer
+          format: int32
+        comentario:
+          type:
+          - string
+          - "null"
+        autor:
+          type: string
+        fecha:
+          type: string
+          format: date-time
     CotizacionRequest:
       type: object
       properties:
@@ -2469,6 +2573,18 @@ components:
           type: array
           items:
             type: string
+    ReservaPorResenarResponse:
+      type: object
+      properties:
+        idReserva:
+          type: integer
+          format: int32
+        fechaLlegada:
+          type: string
+          format: date
+        fechaSalida:
+          type: string
+          format: date
     PoliticaCancelacionResponse:
       type: object
       properties:
@@ -2520,21 +2636,6 @@ components:
           type: string
         resenas:
           $ref: "#/components/schemas/ResumenResenasResponse"
-    ResenaResponse:
-      type: object
-      properties:
-        calificacion:
-          type: integer
-          format: int32
-        comentario:
-          type:
-          - string
-          - "null"
-        autor:
-          type: string
-        fecha:
-          type: string
-          format: date-time
     ResumenResenasResponse:
       type: object
       properties:

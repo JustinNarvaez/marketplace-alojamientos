@@ -16,4 +16,7 @@ public interface ResenaRepository extends JpaRepository<Resena, Integer> {
 
     // SCRUM-50: listado del administrador, filtrando por visibilidad.
     Page<Resena> findByOculta(Boolean oculta, Pageable pageable);
+
+    // SCRUM-46, escenario 3: una sola resena por reserva.
+    boolean existsByReserva_IdReserva(Integer idReserva);
 }

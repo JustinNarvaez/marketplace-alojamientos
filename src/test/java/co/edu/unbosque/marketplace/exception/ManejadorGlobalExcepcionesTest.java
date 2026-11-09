@@ -327,4 +327,28 @@ class ManejadorGlobalExcepcionesTest {
         assertEquals(HttpStatus.BAD_REQUEST, respuesta.getStatusCode());
         assertEquals("Revisa los datos ingresados.", respuesta.getBody().mensaje());
     }
+
+    @Test
+    void reservaNoResenableResponde409() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new ReservaNoResenableException());
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals("Solo puedes reseñar una estancia que ya terminó.", respuesta.getBody().mensaje());
+    }
+
+    @Test
+    void resenaDuplicadaResponde409() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new ResenaDuplicadaException());
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals("Ya reseñaste esta estancia.", respuesta.getBody().mensaje());
+    }
+
+    @Test
+    void reservaNoEncontradaResponde404() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new ReservaNoEncontradaException());
+
+        assertEquals(HttpStatus.NOT_FOUND, respuesta.getStatusCode());
+        assertEquals("La reserva no existe.", respuesta.getBody().mensaje());
+    }
 }

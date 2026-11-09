@@ -1,6 +1,7 @@
 package co.edu.unbosque.marketplace.model;
 
 import co.edu.unbosque.marketplace.exception.ReservaNoConfirmableException;
+import co.edu.unbosque.marketplace.exception.ReservaNoResenableException;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
 import jakarta.persistence.*;
 
@@ -148,6 +149,23 @@ public class Reserva {
     public void validarQueSePuedeConfirmar() {
         if (estado != EstadoReserva.PENDIENTE_APROBACION) {
             throw new ReservaNoConfirmableException(estado);
+        }
+    }
+
+    /**
+     * SCRUM-46: la estancia ya termino. Todavia no hay un proceso que pase
+     * las reservas a COMPLETADA, asi que tambien cuenta una CONFIRMADA cuya
+     * fecha de salida ya llego. Una cancelada, rechazada o pendiente nunca.
+     */
+    public boolean terminoLaEstancia(LocalDate hoy) {
+        return estado == EstadoReserva.COMPLETADA
+                || (estado == EstadoReserva.CONFIRMADA && !fechaSalida.isAfter(hoy));
+    }
+
+    // SCRUM-46, escenario 2: solo se resena una estancia terminada. Responde 409.
+    public void validarQueSePuedeResenar(LocalDate hoy) {
+        if (!terminoLaEstancia(hoy)) {
+            throw new ReservaNoResenableException();
         }
     }
 

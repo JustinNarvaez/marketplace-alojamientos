@@ -9,6 +9,16 @@ import co.edu.unbosque.marketplace.model.Reserva;
 import co.edu.unbosque.marketplace.model.Usuario;
 import co.edu.unbosque.marketplace.model.enums.EstadoCuenta;
 import co.edu.unbosque.marketplace.repository.ResenaRepository;
+import co.edu.unbosque.marketplace.repository.ReservaRepository;
+import co.edu.unbosque.marketplace.dto.CrearResenaRequest;
+import co.edu.unbosque.marketplace.dto.ReservaPorResenarResponse;
+import co.edu.unbosque.marketplace.exception.ResenaDuplicadaException;
+import co.edu.unbosque.marketplace.exception.ReservaNoEncontradaException;
+import co.edu.unbosque.marketplace.exception.ReservaNoResenableException;
+import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
+import co.edu.unbosque.marketplace.model.enums.ResultadoAuditoria;
+import co.edu.unbosque.marketplace.model.enums.TipoEventoAuditoria;
+import org.mockito.ArgumentCaptor;
 import co.edu.unbosque.marketplace.repository.UsuarioRepository;
 import co.edu.unbosque.marketplace.dto.PaginaResponse;
 import co.edu.unbosque.marketplace.dto.ResenaAdminResponse;
@@ -23,6 +33,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -48,13 +59,15 @@ class ResenaServiceTest {
     private UsuarioRepository usuarioRepository;
     @Mock
     private ServicioAuditoria servicioAuditoria;
+    @Mock
+    private ReservaRepository reservaRepository;
 
     // SCRUM-35, escenario 2: (5 + 4 + 4) / 3 = 4.333... -> 4.3
     @Test
     void elPromedioSeRedondeaAUnDecimal() {
         cuandoLaPublicacionTiene(resena(5, "Excelente"), resena(4, null), resena(4, "Muy bien"));
 
-        ResumenResenasResponse resumen = new ResenaService(resenaRepository, usuarioRepository, servicioAuditoria).resumenDe(1);
+        ResumenResenasResponse resumen = new ResenaService(resenaRepository, usuarioRepository, servicioAuditoria, reservaRepository).resumenDe(1);
 
         assertEquals(new BigDecimal("4.3"), resumen.calificacionPromedio());
         assertEquals(3, resumen.totalResenas());
@@ -71,14 +84,14 @@ class ResenaServiceTest {
                 resena(4, null));
 
         // (13 * 5 + 7 * 4) / 20 = 93 / 20 = 4.65
-        assertEquals(new BigDecimal("4.7"), new ResenaService(resenaRepository, usuarioRepository, servicioAuditoria).resumenDe(1).calificacionPromedio());
+        assertEquals(new BigDecimal("4.7"), new ResenaService(resenaRepository, usuarioRepository, servicioAuditoria, reservaRepository).resumenDe(1).calificacionPromedio());
     }
 
     @Test
     void sinResenasElPromedioEsNull() {
         cuandoLaPublicacionTiene();
 
-        ResumenResenasResponse resumen = new ResenaService(resenaRepository, usuarioRepository, servicioAuditoria).resumenDe(1);
+        ResumenResenasResponse resumen = new ResenaService(resenaRepository, usuarioRepository, servicioAuditoria, reservaRepository).resumenDe(1);
 
         assertNull(resumen.calificacionPromedio());
         assertEquals(0, resumen.totalResenas());
@@ -88,7 +101,7 @@ class ResenaServiceTest {
     void elAutorEsSoloElNombreDePila() {
         cuandoLaPublicacionTiene(resena(5, "Excelente"));
 
-        ResenaResponse resena = new ResenaService(resenaRepository, usuarioRepository, servicioAuditoria).resumenDe(1).resenas().getFirst();
+        ResenaResponse resena = new ResenaService(resenaRepository, usuarioRepository, servicioAuditoria, reservaRepository).resumenDe(1).resenas().getFirst();
 
         assertEquals("Carlos", resena.autor());
         assertEquals("Excelente", resena.comentario());
@@ -110,7 +123,7 @@ class ResenaServiceTest {
     // ---- SCRUM-50: ocultar resenas ----
 
     private ResenaService servicio() {
-        return new ResenaService(resenaRepository, usuarioRepository, servicioAuditoria);
+        return new ResenaService(resenaRepository, usuarioRepository, servicioAuditoria, reservaRepository);
     }
 
     private static Usuario unAdministrador() {
@@ -210,5 +223,128 @@ class ResenaServiceTest {
         when(resenaRepository.findByOculta(eq(true), any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
 
         assertEquals(0, servicio().listarParaAdmin(true, 0, 20).totalElementos());
+    }
+
+    // ---- SCRUM-46: crear resena ----
+
+    private static Usuario unHuesped() {
+        Usuario huesped = new Usuario("Laura", "Gomez", "laura@ejemplo.com", "hash", null,
+                OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        huesped.setIdUsuario(5);
+        return huesped;
+    }
+
+    private static Reserva unaReserva(Usuario huesped, EstadoReserva estado, LocalDate salida) {
+        Reserva reserva = new Reserva(new Huesped(huesped), null, null, salida.minusDays(3), salida, (short) 2,
+                estado, OffsetDateTime.now(), "clave-46", new BigDecimal("100000"), (short) 3,
+                new BigDecimal("300000"), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("300000"));
+        reserva.setIdReserva(10);
+        return reserva;
+    }
+
+    private void prepararReserva(Usuario huesped, Reserva reserva) {
+        when(usuarioRepository.findByEmail("laura@ejemplo.com")).thenReturn(Optional.of(huesped));
+        when(reservaRepository.findByIdReservaAndHuesped_IdUsuario(10, 5)).thenReturn(Optional.of(reserva));
+    }
+
+    @Test
+    void crearEscenarios1y4_guardaLaResenaDeLaReservaYAudita() {
+        Usuario huesped = unHuesped();
+        Reserva reserva = unaReserva(huesped, EstadoReserva.COMPLETADA, LocalDate.now().minusDays(2));
+        prepararReserva(huesped, reserva);
+        when(resenaRepository.existsByReserva_IdReserva(10)).thenReturn(false);
+        when(resenaRepository.save(any(Resena.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+
+        ResenaResponse respuesta = servicio().crear("laura@ejemplo.com", 10,
+                new CrearResenaRequest((short) 5, "  Excelente lugar "), "127.0.0.1");
+
+        ArgumentCaptor<Resena> guardada = ArgumentCaptor.forClass(Resena.class);
+        verify(resenaRepository).save(guardada.capture());
+        assertEquals(reserva, guardada.getValue().getReserva());
+        assertEquals((short) 5, guardada.getValue().getCalificacion());
+        assertEquals("Excelente lugar", guardada.getValue().getComentario());
+        assertEquals(Boolean.FALSE, guardada.getValue().getOculta());
+        assertEquals("Laura", respuesta.autor());
+        verify(servicioAuditoria).registrarEnTransaccionActual(eq(huesped), eq(TipoEventoAuditoria.RESENA),
+                eq("resena"), any(), eq("CREAR_RESENA"), eq(ResultadoAuditoria.EXITO), eq("127.0.0.1"));
+    }
+
+    @Test
+    void crearConUnaConfirmadaCuyaSalidaYaPasoTambienSePuede() {
+        Usuario huesped = unHuesped();
+        prepararReserva(huesped, unaReserva(huesped, EstadoReserva.CONFIRMADA, LocalDate.now()));
+        when(resenaRepository.existsByReserva_IdReserva(10)).thenReturn(false);
+        when(resenaRepository.save(any(Resena.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+
+        ResenaResponse respuesta = servicio().crear("laura@ejemplo.com", 10,
+                new CrearResenaRequest((short) 4, null), "127.0.0.1");
+
+        assertNull(respuesta.comentario());
+    }
+
+    @Test
+    void crearEscenario2_unaEstanciaQueNoHaTerminadoSeRechaza() {
+        Usuario huesped = unHuesped();
+        prepararReserva(huesped, unaReserva(huesped, EstadoReserva.CONFIRMADA, LocalDate.now().plusDays(3)));
+        CrearResenaRequest solicitud = new CrearResenaRequest((short) 5, "Aun no llego");
+
+        assertThrows(ReservaNoResenableException.class,
+                () -> servicio().crear("laura@ejemplo.com", 10, solicitud, "127.0.0.1"));
+
+        verify(resenaRepository, never()).save(any());
+        verifyNoInteractions(servicioAuditoria);
+    }
+
+    @Test
+    void crearEscenario2_unaReservaCanceladaNoSeResena() {
+        Usuario huesped = unHuesped();
+        prepararReserva(huesped, unaReserva(huesped, EstadoReserva.CANCELADA, LocalDate.now().minusDays(5)));
+        CrearResenaRequest solicitud = new CrearResenaRequest((short) 1, "Cancelada");
+
+        assertThrows(ReservaNoResenableException.class,
+                () -> servicio().crear("laura@ejemplo.com", 10, solicitud, "127.0.0.1"));
+    }
+
+    @Test
+    void crearEscenario2_unaReservaAjenaRespondeNoEncontrada() {
+        when(usuarioRepository.findByEmail("laura@ejemplo.com")).thenReturn(Optional.of(unHuesped()));
+        when(reservaRepository.findByIdReservaAndHuesped_IdUsuario(99, 5)).thenReturn(Optional.empty());
+        CrearResenaRequest solicitud = new CrearResenaRequest((short) 5, "No es mia");
+
+        assertThrows(ReservaNoEncontradaException.class,
+                () -> servicio().crear("laura@ejemplo.com", 99, solicitud, "127.0.0.1"));
+    }
+
+    @Test
+    void crearEscenario3_unaSegundaResenaDeLaMismaReservaSeRechaza() {
+        Usuario huesped = unHuesped();
+        prepararReserva(huesped, unaReserva(huesped, EstadoReserva.COMPLETADA, LocalDate.now().minusDays(2)));
+        when(resenaRepository.existsByReserva_IdReserva(10)).thenReturn(true);
+        CrearResenaRequest solicitud = new CrearResenaRequest((short) 3, "Otra vez");
+
+        assertThrows(ResenaDuplicadaException.class,
+                () -> servicio().crear("laura@ejemplo.com", 10, solicitud, "127.0.0.1"));
+
+        verify(resenaRepository, never()).save(any());
+    }
+
+    @Test
+    void pendientesDeResenaExcluyeLasQueYaTienenResena() {
+        Usuario huesped = unHuesped();
+        Reserva sinResena = unaReserva(huesped, EstadoReserva.COMPLETADA, LocalDate.now().minusDays(2));
+        Reserva conResena = unaReserva(huesped, EstadoReserva.COMPLETADA, LocalDate.now().minusDays(20));
+        conResena.setIdReserva(11);
+        when(usuarioRepository.findByEmail("laura@ejemplo.com")).thenReturn(Optional.of(huesped));
+        when(reservaRepository
+                .findByHuesped_IdUsuarioAndPublicacion_IdPublicacionAndEstadoInAndFechaSalidaLessThanEqualOrderByFechaSalidaDesc(
+                        eq(5), eq(1), any(), any()))
+                .thenReturn(List.of(sinResena, conResena));
+        when(resenaRepository.existsByReserva_IdReserva(10)).thenReturn(false);
+        when(resenaRepository.existsByReserva_IdReserva(11)).thenReturn(true);
+
+        List<ReservaPorResenarResponse> pendientes = servicio().pendientesDeResena("laura@ejemplo.com", 1);
+
+        assertEquals(List.of(10), pendientes.stream().map(ReservaPorResenarResponse::idReserva).toList());
     }
 }

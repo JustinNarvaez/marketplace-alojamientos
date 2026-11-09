@@ -17,6 +17,8 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { pedir, ErrorApi } from '../api/cliente'
 import Cotizador from '../componentes/Cotizador'
 import ConsultaDisponibilidad from '../componentes/ConsultaDisponibilidad'
+import FormularioResena from '../componentes/FormularioResena'
+import { usarSesion } from '../sesion/SesionContext'
 
 // Coinciden con DetalleAlojamientoResponse del backend (los DTO son el contrato)
 interface Servicio {
@@ -76,6 +78,9 @@ export default function DetalleAlojamiento() {
     const ubicacion = useLocation()
     const [detalle, setDetalle] = useState<Detalle | null>(null)
     const [error, setError] = useState<string | null>(null)
+    // SCRUM-46: al publicar una resena se vuelve a cargar el detalle (promedio y listado).
+    const [recargas, setRecargas] = useState(0)
+    const { tieneRol } = usarSesion()
 
     useEffect(() => {
         pedir<Detalle>(`/listings/${idPublicacion}`)
@@ -85,7 +90,7 @@ export default function DetalleAlojamiento() {
                 // "Esta publicación ya no está disponible."
                 setError(e instanceof ErrorApi ? e.message : 'No pudimos cargar el alojamiento.')
             })
-    }, [idPublicacion])
+    }, [idPublicacion, recargas])
 
     // Escenario 4: volver con el historial conserva la URL de la busqueda,
     // y con ella sus filtros. Si se entro directo (sin historial), va al inicio.
@@ -200,6 +205,11 @@ export default function DetalleAlojamiento() {
                         </Typography>
                         <Typography color="text.secondary">{detalle.descripcionPoliticaCancelacion}</Typography>
                     </Paper>
+
+                    {tieneRol('HUESPED') && (
+                        <FormularioResena idPublicacion={publicacion.idPublicacion}
+                                          alPublicar={() => setRecargas((valor) => valor + 1)} />
+                    )}
 
                     <Paper sx={{ p: 3 }}>
                         <Typography variant="h6" gutterBottom>Reseñas</Typography>

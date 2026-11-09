@@ -75,6 +75,21 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(ReservaNoResenableException.class)
+    public ResponseEntity<ErrorResponse> manejar(ReservaNoResenableException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(ResenaDuplicadaException.class)
+    public ResponseEntity<ErrorResponse> manejar(ResenaDuplicadaException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(ReservaNoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> manejar(ReservaNoEncontradaException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(ReservaNoConfirmableException.class)
     public ResponseEntity<ErrorResponse> manejar(ReservaNoConfirmableException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
