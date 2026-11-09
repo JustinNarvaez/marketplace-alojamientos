@@ -4,6 +4,7 @@ import co.edu.unbosque.marketplace.exception.PublicacionBloqueadaException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoActivaException;
 import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
 import co.edu.unbosque.marketplace.model.enums.TipoAlojamiento;
+import co.edu.unbosque.marketplace.exception.CambioEstadoPublicacionInvalidoException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -95,5 +96,40 @@ class PublicacionTest {
 
             assertEquals(estado == EstadoPublicacion.ACTIVA, publicacion.esVisibleParaHuespedes(), estado.name());
         }
+    }
+
+    // ---- SCRUM-48 ----
+
+    @Test
+    void bloquearUnaActivaLaDejaBloqueada() {
+        Publicacion publicacion = unaPublicacion(EstadoPublicacion.ACTIVA, OffsetDateTime.now());
+
+        publicacion.bloquear();
+
+        assertEquals(EstadoPublicacion.BLOQUEADA, publicacion.getEstado());
+    }
+
+    @Test
+    void bloquearDosVecesEsUnConflicto() {
+        Publicacion publicacion = unaPublicacion(EstadoPublicacion.BLOQUEADA, OffsetDateTime.now());
+
+        assertThrows(CambioEstadoPublicacionInvalidoException.class, publicacion::bloquear);
+    }
+
+    @Test
+    void desbloquearLaDejaPausadaParaQueElAnfitrionDecida() {
+        Publicacion publicacion = unaPublicacion(EstadoPublicacion.BLOQUEADA, OffsetDateTime.now());
+
+        publicacion.desbloquear();
+
+        assertEquals(EstadoPublicacion.PAUSADA, publicacion.getEstado());
+    }
+
+    @Test
+    void desbloquearUnaQueNoEstaBloqueadaEsUnConflicto() {
+        Publicacion publicacion = unaPublicacion(EstadoPublicacion.ACTIVA, OffsetDateTime.now());
+
+        assertThrows(CambioEstadoPublicacionInvalidoException.class, publicacion::desbloquear);
+        assertEquals(EstadoPublicacion.ACTIVA, publicacion.getEstado());
     }
 }

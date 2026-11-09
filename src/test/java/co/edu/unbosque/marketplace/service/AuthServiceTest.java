@@ -150,6 +150,20 @@ class AuthServiceTest {
                 eq(7), eq("INICIO_SESION"), eq(ResultadoAuditoria.FALLO), eq("127.0.0.1"));
     }
 
+    // SCRUM-49, escenario 1: un usuario restringido no puede iniciar sesion.
+    @Test
+    void cuentaRestringidaNoPuedeIniciarSesion() {
+        Usuario usuario = unUsuarioActivo();
+        usuario.setEstadoCuenta(EstadoCuenta.RESTRINGIDA);
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("Secreta123", "hash-guardado")).thenReturn(true);
+
+        CuentaNoDisponibleException excepcion = assertThrows(CuentaNoDisponibleException.class,
+                () -> authService.iniciarSesion("ana@ejemplo.com", "Secreta123", "127.0.0.1"));
+
+        assertEquals(EstadoCuenta.RESTRINGIDA, excepcion.getMotivo());
+    }
+
     @Test
     void escenario4_cualquierIntentoQuedaRegistrado() {
         when(usuarioRepository.findByEmail("fantasma@ejemplo.com")).thenReturn(Optional.empty());

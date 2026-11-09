@@ -2,6 +2,7 @@ package co.edu.unbosque.marketplace.model;
 
 import co.edu.unbosque.marketplace.model.enums.EstadoCuenta;
 import jakarta.persistence.*;
+import co.edu.unbosque.marketplace.exception.CambioEstadoCuentaInvalidoException;
 import co.edu.unbosque.marketplace.exception.CuentaNoDisponibleException;
 import java.time.OffsetDateTime;
 
@@ -49,6 +50,22 @@ public class Usuario {
 
     public void reactivar() {
         exigirNoRestringida();
+        this.estadoCuenta = EstadoCuenta.ACTIVA;
+    }
+
+    // SCRUM-49, escenario 1: solo un ADMINISTRADOR (lo valida el servicio).
+    public void restringir() {
+        if (estadoCuenta == EstadoCuenta.RESTRINGIDA) {
+            throw new CambioEstadoCuentaInvalidoException("Esta cuenta ya está restringida.");
+        }
+        this.estadoCuenta = EstadoCuenta.RESTRINGIDA;
+    }
+
+    // SCRUM-49, escenario 2: el usuario recupera el acceso.
+    public void levantarRestriccion() {
+        if (estadoCuenta != EstadoCuenta.RESTRINGIDA) {
+            throw new CambioEstadoCuentaInvalidoException("Esta cuenta no está restringida.");
+        }
         this.estadoCuenta = EstadoCuenta.ACTIVA;
     }
 

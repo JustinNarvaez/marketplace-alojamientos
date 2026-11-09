@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -40,7 +41,7 @@ class ServicioAuditoriaTest {
 
     @Test
     void guardaElLogConLosDatosRecibidos() {
-        ServicioAuditoria servicioAuditoria = new ServicioAuditoria(logAuditoriaRepository);
+        ServicioAuditoria servicioAuditoria = new ServicioAuditoria(logAuditoriaRepository, new ObjectMapper());
         Usuario usuario = new Usuario("Ana", "Gomez", "ana@ejemplo.com", "hash",
                 "3000000000", OffsetDateTime.now(), EstadoCuenta.ACTIVA);
         usuario.setIdUsuario(1);
@@ -62,7 +63,7 @@ class ServicioAuditoriaTest {
 
     @Test
     void registrarEnTransaccionActualGuardaElLogConLosDatosRecibidos() {
-        ServicioAuditoria servicioAuditoria = new ServicioAuditoria(logAuditoriaRepository);
+        ServicioAuditoria servicioAuditoria = new ServicioAuditoria(logAuditoriaRepository, new ObjectMapper());
         Usuario usuario = new Usuario("Ana", "Gomez", "ana@ejemplo.com", "hash",
                 "3000000000", OffsetDateTime.now(), EstadoCuenta.ACTIVA);
         usuario.setIdUsuario(1);
@@ -109,7 +110,7 @@ class ServicioAuditoriaTest {
 
     @Test
     void escenario1_elEventoSaleConEventoUsuarioEntidadYResultado() {
-        new ServicioAuditoria(logAuditoriaRepository).registrar(ana(), TipoEventoAuditoria.PUBLICACION,
+        new ServicioAuditoria(logAuditoriaRepository, new ObjectMapper()).registrar(ana(), TipoEventoAuditoria.PUBLICACION,
                 "publicacion", 9, "CREACION_PUBLICACION", ResultadoAuditoria.EXITO, "127.0.0.1");
 
         assertEquals(1, logs.list.size());
@@ -126,7 +127,7 @@ class ServicioAuditoriaTest {
 
     @Test
     void escenario2_elLogNoLlevaElCorreoNiLaIp() {
-        new ServicioAuditoria(logAuditoriaRepository).registrar(ana(), TipoEventoAuditoria.AUTENTICACION,
+        new ServicioAuditoria(logAuditoriaRepository, new ObjectMapper()).registrar(ana(), TipoEventoAuditoria.AUTENTICACION,
                 "usuario", 1, "INICIO_SESION", ResultadoAuditoria.EXITO, "127.0.0.1");
 
         ILoggingEvent evento = logs.list.getFirst();
@@ -138,7 +139,7 @@ class ServicioAuditoriaTest {
 
     @Test
     void unFalloSaleComoWarnYSinUsuarioSiNoSeConoce() {
-        new ServicioAuditoria(logAuditoriaRepository).registrar(null, TipoEventoAuditoria.AUTENTICACION,
+        new ServicioAuditoria(logAuditoriaRepository, new ObjectMapper()).registrar(null, TipoEventoAuditoria.AUTENTICACION,
                 null, null, "INICIO_SESION", ResultadoAuditoria.FALLO, "127.0.0.1");
 
         ILoggingEvent evento = logs.list.getFirst();
@@ -149,7 +150,7 @@ class ServicioAuditoriaTest {
 
     @Test
     void escenario3_unCambioDeEstadoLlevaElEstadoAnteriorYElNuevo() {
-        new ServicioAuditoria(logAuditoriaRepository).registrarCambioEstado(ana(), TipoEventoAuditoria.PUBLICACION,
+        new ServicioAuditoria(logAuditoriaRepository, new ObjectMapper()).registrarCambioEstado(ana(), TipoEventoAuditoria.PUBLICACION,
                 "publicacion", 9, "PAUSA_PUBLICACION",
                 new ServicioAuditoria.CambioEstado("ACTIVA", "PAUSADA"), "127.0.0.1");
 
@@ -164,11 +165,33 @@ class ServicioAuditoriaTest {
     void conTransaccionElLogSaleSoloDespuesDelCommit() {
         TransactionSynchronizationManager.initSynchronization();
 
-        new ServicioAuditoria(logAuditoriaRepository).registrarEnTransaccionActual(ana(),
+        new ServicioAuditoria(logAuditoriaRepository, new ObjectMapper()).registrarEnTransaccionActual(ana(),
                 TipoEventoAuditoria.AUTENTICACION, "usuario", 1, "REGISTRO", ResultadoAuditoria.EXITO, "127.0.0.1");
 
         assertTrue(logs.list.isEmpty(), "No debe salir antes del commit");
         TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
         assertEquals(1, logs.list.size());
+    }
+
+    // SCRUM-49, escenario 3: el motivo queda en la columna detalle.
+    @Test
+    void registrarAccionAdminGuardaElMotivoYLosEstadosEnElDetalle() {
+        Usuario admin = new Usuario("Carla", "Admin", "admin@ejemplo.com", "hash",
+                "3000000000", OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        admin.setIdUsuario(1);
+
+        new ServicioAuditoria(logAuditoriaRepository, new ObjectMapper()).registrarAccionAdmin(admin, "usuario", 7,
+                "RESTRICCION_USUARIO", new ServicioAuditoria.CambioEstado("ACTIVA", "RESTRINGIDA"),
+                "Dice \"spam\"", "127.0.0.1");
+
+        ArgumentCaptor<LogAuditoria> captor = ArgumentCaptor.forClass(LogAuditoria.class);
+        verify(logAuditoriaRepository).save(captor.capture());
+        LogAuditoria log = captor.getValue();
+        assertEquals(admin, log.getUsuario());
+        assertEquals(TipoEventoAuditoria.ACCION_ADMIN, log.getTipoEvento());
+        assertEquals("RESTRICCION_USUARIO", log.getAccion());
+        assertEquals(ResultadoAuditoria.EXITO, log.getResultado());
+        assertEquals("{\"estadoAnterior\":\"ACTIVA\",\"estadoNuevo\":\"RESTRINGIDA\",\"motivo\":\"Dice \\\"spam\\\"\"}",
+                log.getDetalle());
     }
 }

@@ -15,6 +15,8 @@ import CrearPublicacion from './paginas/CrearPublicacion'
 import DetalleAlojamiento from './paginas/DetalleAlojamiento'
 import ServiciosAdicionales from './paginas/ServiciosAdicionales'
 import Auditoria from './paginas/Auditoria'
+import AdminUsuarios from './paginas/AdminUsuarios'
+import AdminPublicaciones from './paginas/AdminPublicaciones'
 import Reportes from './paginas/Reportes'
 import MisPublicaciones from './paginas/MisPublicaciones'
 import DetallePublicacion from './paginas/DetallePublicacion'
@@ -52,6 +54,8 @@ export default function App() {
                 </Route>
                 <Route element={<RutaProtegida roles={['ADMINISTRADOR']} />}>
                     <Route path="administracion" element={<PaginaPendiente titulo="Administración" />} />
+                    <Route path="administracion/usuarios" element={<AdminUsuarios />} />
+                    <Route path="administracion/publicaciones" element={<AdminPublicaciones />} />
                     <Route path="administracion/auditoria" element={<Auditoria />} />
                     <Route path="administracion/reportes" element={<Reportes />} />
                 </Route>
