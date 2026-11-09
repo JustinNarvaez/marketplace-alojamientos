@@ -13,6 +13,9 @@ tags:
 - name: Autenticación
   description: "Registro, inicio de sesión y recuperación de cuenta. Todo público\
     \ (SCRUM-22)."
+- name: Reservas
+  description: Crear y confirmar una reserva inmediata (SCRUM-38) y consultar el estado
+    y el historial (SCRUM-40).
 - name: Servicios adicionales
   description: Extras con precio que ofrece cada publicación (SCRUM-37).
 - name: Mi cuenta
@@ -31,8 +34,6 @@ tags:
   description: "Catálogo de servicios adicionales de un alojamiento (ej. WiFi, parqueadero)."
 - name: Publicaciones
   description: Publicaciones de alojamientos del anfitrión (SCRUM-27).
-- name: Reservas
-  description: Crear y confirmar una reserva inmediata (SCRUM-38).
 - name: Administración de publicaciones
   description: Moderación de publicaciones por el administrador (SCRUM-48).
 - name: Búsqueda
@@ -1266,6 +1267,42 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/reservas/{idReserva}:
+    get:
+      tags:
+      - Reservas
+      summary: Detalle de una reserva
+      description: Desglose de costos y estado actual. Solo para el huésped que reservó
+        o el anfitrión del alojamiento.
+      operationId: consultar_1
+      parameters:
+      - name: idReserva
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: Detalle de la reserva
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReservaResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La reserva no existe o no es tuya
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/reservas/{idReserva}/cancelacion/simulacion:
     get:
       tags:
@@ -1302,6 +1339,37 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/reservas/recibidas:
+    get:
+      tags:
+      - Reservas
+      summary: Reservas recibidas
+      description: Reservas de los alojamientos del anfitrión de la sesión; nunca
+        las de otros anfitriones.
+      operationId: listarRecibidas
+      responses:
+        "200":
+          description: Listado (puede venir vacío)
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReservaResumenResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: La sesión no tiene el rol ANFITRIÓN
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/reservas/por-resenar:
     get:
       tags:
@@ -1326,6 +1394,37 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ReservaPorResenarResponse"
+      security:
+      - bearerAuth: []
+  /api/reservas/mias:
+    get:
+      tags:
+      - Reservas
+      summary: Mis reservas
+      description: "Reservas del huésped de la sesión con alojamiento, fechas, total\
+        \ y estado. Lista vacía si no tiene."
+      operationId: listarMias
+      responses:
+        "200":
+          description: Listado (puede venir vacío)
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReservaResumenResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: La sesión no tiene el rol HUÉSPED
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
   /api/politicas-cancelacion:
@@ -1418,7 +1517,7 @@ paths:
       summary: Consultar disponibilidad por fechas
       description: "Indica si el rango está libre y diferencia los periodos disponibles,\
         \ reservados y bloqueados."
-      operationId: consultar_1
+      operationId: consultar_2
       parameters:
       - name: id
         in: path
@@ -1470,7 +1569,7 @@ paths:
       tags:
       - Publicaciones
       summary: Listar mis publicaciones
-      operationId: listarMias
+      operationId: listarMias_1
       responses:
         "200":
           description: Listado de publicaciones del anfitrión (vacío si no tiene ninguna)
@@ -1856,7 +1955,7 @@ paths:
       - Auditoría
       summary: Consultar eventos de auditoría
       description: Del más reciente al más antiguo. Todos los filtros son opcionales.
-      operationId: consultar_2
+      operationId: consultar_3
       parameters:
       - name: desde
         in: query
@@ -2231,6 +2330,8 @@ components:
         idPublicacion:
           type: integer
           format: int32
+        tituloPublicacion:
+          type: string
         fechaLlegada:
           type: string
           format: date
@@ -2741,6 +2842,34 @@ components:
           type: number
         valorDevolucion:
           type: number
+    ReservaResumenResponse:
+      type: object
+      properties:
+        idReserva:
+          type: integer
+          format: int32
+        idPublicacion:
+          type: integer
+          format: int32
+        tituloPublicacion:
+          type: string
+        ciudad:
+          type: string
+        fechaLlegada:
+          type: string
+          format: date
+        fechaSalida:
+          type: string
+          format: date
+        numeroHuespedes:
+          type: integer
+          format: int32
+        total:
+          type: number
+        estado:
+          type: string
+        nombreHuesped:
+          type: string
     ReservaPorResenarResponse:
       type: object
       properties:

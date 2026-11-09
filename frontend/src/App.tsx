@@ -10,6 +10,9 @@ import NoAutorizado from './paginas/NoAutorizado'
 import NoEncontrado from './paginas/NoEncontrado'
 import PaginaPendiente from './paginas/PaginaPendiente'
 import CancelarReserva from './paginas/CancelarReserva'
+import MisReservas from './paginas/MisReservas'
+import ReservasRecibidas from './paginas/ReservasRecibidas'
+import DetalleReserva from './paginas/DetalleReserva'
 import MiCuenta from './paginas/MiCuenta'
 import Notificaciones from './paginas/Notificaciones'
 import CrearPublicacion from './paginas/CrearPublicacion'
@@ -42,11 +45,14 @@ export default function App() {
                 </Route>
 
                 <Route element={<RutaProtegida roles={['HUESPED']} />}>
-                    <Route path="mis-reservas" element={<PaginaPendiente titulo="Mis reservas" />} />
+                    <Route path="mis-reservas" element={<MisReservas />} />
+                    <Route path="mis-reservas/:idReserva" element={<DetalleReserva vista="huesped" />} />
                     <Route path="mis-reservas/:idReserva/cancelar" element={<CancelarReserva />} />
                 </Route>
                 <Route element={<RutaProtegida roles={['ANFITRION']} />}>
                     <Route path="mis-publicaciones" element={<MisPublicaciones />} />
+                    <Route path="reservas-recibidas" element={<ReservasRecibidas />} />
+                    <Route path="reservas-recibidas/:idReserva" element={<DetalleReserva vista="anfitrion" />} />
                     <Route path="mis-publicaciones/nueva" element={<CrearPublicacion />} />
                     <Route path="mis-publicaciones/:idPublicacion/extras" element={<ServiciosAdicionales />} />
                     <Route path="mis-publicaciones/:idPublicacion/extras" element={<ServiciosAdicionales />} />

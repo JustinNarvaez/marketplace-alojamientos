@@ -4,10 +4,13 @@ import co.edu.unbosque.marketplace.dto.CotizacionRequest;
 import co.edu.unbosque.marketplace.dto.CotizacionResponse;
 import co.edu.unbosque.marketplace.dto.CrearReservaRequest;
 import co.edu.unbosque.marketplace.dto.ReservaResponse;
+import co.edu.unbosque.marketplace.dto.ReservaResumenResponse;
 import co.edu.unbosque.marketplace.dto.ServicioAdicionalResponse;
 import co.edu.unbosque.marketplace.exception.PeriodoNoDisponibleException;
+import co.edu.unbosque.marketplace.exception.ReservaNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.ReservaRequiereAprobacionException;
 import co.edu.unbosque.marketplace.model.Alojamiento;
+import co.edu.unbosque.marketplace.model.Anfitrion;
 import co.edu.unbosque.marketplace.model.Huesped;
 import co.edu.unbosque.marketplace.model.Publicacion;
 import co.edu.unbosque.marketplace.model.Reserva;
@@ -229,5 +232,89 @@ class ReservaServiceTest {
         verify(cotizacionService, never()).cotizar(any());
         verify(disponibilidadService, never()).confirmarReservaYBloquear(any());
         verify(reservaRepository, never()).save(any());
+    }
+
+    // ---------- SCRUM-40: consultar estado e historial ----------
+
+    private static final String CORREO_ANFITRION = "anfitrion@ejemplo.com";
+
+    private Usuario unAnfitrion() {
+        Usuario anfitrion = new Usuario("Luis", "Diaz", CORREO_ANFITRION, "hash", null, OffsetDateTime.now(),
+                EstadoCuenta.ACTIVA);
+        anfitrion.setIdUsuario(9);
+        return anfitrion;
+    }
+
+    // Reserva de Ana (huesped 7) en un alojamiento de Luis (anfitrion 9).
+    private Reserva unaReservaDeAnaEnCasaDeLuis() {
+        Alojamiento alojamiento = new Alojamiento(new Anfitrion(unAnfitrion()), TipoAlojamiento.APARTAMENTO,
+                (short) 4, "Cartagena", "Cra 1 # 2-3", null, OffsetDateTime.now());
+        Reserva reserva = new Reserva(new Huesped(unUsuario()), alojamiento, unaPublicacion(true), LLEGADA, SALIDA,
+                (short) 2, EstadoReserva.CONFIRMADA, OffsetDateTime.now(), CLAVE, new BigDecimal("100000.00"),
+                (short) 3, new BigDecimal("300000.00"), new BigDecimal("50000.00"), new BigDecimal("30000.00"),
+                BigDecimal.ZERO, new BigDecimal("380000.00"));
+        reserva.setIdReserva(42);
+        return reserva;
+    }
+
+    @Test
+    void misReservasTraeAlojamientoFechasTotalYEstado() {
+        when(usuarioRepository.findByEmail(CORREO)).thenReturn(Optional.of(unUsuario()));
+        when(reservaRepository.findByHuesped_IdUsuarioOrderByFechaLlegadaDesc(7))
+                .thenReturn(List.of(unaReservaDeAnaEnCasaDeLuis()));
+
+        List<ReservaResumenResponse> reservas = reservaService.listarMias(CORREO);
+
+        assertEquals(List.of(new ReservaResumenResponse(42, 1, "Frente al mar", "Cartagena", LLEGADA, SALIDA,
+                (short) 2, new BigDecimal("380000.00"), "CONFIRMADA", "Ana Lopez")), reservas);
+    }
+
+    @Test
+    void sinReservasElListadoVieneVacio() {
+        when(usuarioRepository.findByEmail(CORREO)).thenReturn(Optional.of(unUsuario()));
+        when(reservaRepository.findByHuesped_IdUsuarioOrderByFechaLlegadaDesc(7)).thenReturn(List.of());
+
+        assertEquals(List.of(), reservaService.listarMias(CORREO));
+    }
+
+    @Test
+    void elAnfitrionSoloConsultaLasReservasDeSusAlojamientos() {
+        when(usuarioRepository.findByEmail(CORREO_ANFITRION)).thenReturn(Optional.of(unAnfitrion()));
+        when(reservaRepository.findByAlojamiento_Anfitrion_IdUsuarioOrderByFechaLlegadaDesc(9))
+                .thenReturn(List.of(unaReservaDeAnaEnCasaDeLuis()));
+
+        List<ReservaResumenResponse> reservas = reservaService.listarRecibidas(CORREO_ANFITRION);
+
+        assertEquals(1, reservas.size());
+        assertEquals("Ana Lopez", reservas.get(0).nombreHuesped());
+        verify(reservaRepository, never()).findByHuesped_IdUsuarioOrderByFechaLlegadaDesc(any());
+    }
+
+    @Test
+    void elDetalleTraeElDesgloseParaElHuespedYParaElAnfitrion() {
+        when(usuarioRepository.findByEmail(CORREO)).thenReturn(Optional.of(unUsuario()));
+        when(usuarioRepository.findByEmail(CORREO_ANFITRION)).thenReturn(Optional.of(unAnfitrion()));
+        when(reservaRepository.findById(42)).thenReturn(Optional.of(unaReservaDeAnaEnCasaDeLuis()));
+        when(detalleServicioReservaRepository.findByReserva_IdReserva(42)).thenReturn(List.of());
+
+        ReservaResponse delHuesped = reservaService.consultar(CORREO, 42);
+        ReservaResponse delAnfitrion = reservaService.consultar(CORREO_ANFITRION, 42);
+
+        assertEquals("Frente al mar", delHuesped.tituloPublicacion());
+        assertEquals("CONFIRMADA", delHuesped.estado());
+        assertEquals(new BigDecimal("300000.00"), delHuesped.subtotalAlojamiento());
+        assertEquals(new BigDecimal("380000.00"), delHuesped.total());
+        assertEquals(delHuesped, delAnfitrion);
+    }
+
+    @Test
+    void elDetalleDeUnaReservaAjenaRespondeNoEncontrada() {
+        Usuario otro = new Usuario("Otro", "Usuario", "otro@ejemplo.com", "hash", null, OffsetDateTime.now(),
+                EstadoCuenta.ACTIVA);
+        otro.setIdUsuario(8);
+        when(usuarioRepository.findByEmail("otro@ejemplo.com")).thenReturn(Optional.of(otro));
+        when(reservaRepository.findById(42)).thenReturn(Optional.of(unaReservaDeAnaEnCasaDeLuis()));
+
+        assertThrows(ReservaNoEncontradaException.class, () -> reservaService.consultar("otro@ejemplo.com", 42));
     }
 }

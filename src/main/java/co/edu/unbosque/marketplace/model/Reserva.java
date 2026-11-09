@@ -136,6 +136,16 @@ public class Reserva {
     }
 
     /**
+     * SCRUM-40, escenarios 2 y 3: el detalle lo ve el huesped que reservo o
+     * el anfitrion dueno del alojamiento. Se compara por el usuario (y no por
+     * el id de huesped/anfitrion) porque ese id lo copia @MapsId al guardar.
+     */
+    public boolean esVisiblePara(Integer idUsuario) {
+        return idUsuario != null && (idUsuario.equals(huesped.getUsuario().getIdUsuario())
+                || idUsuario.equals(alojamiento.getAnfitrion().getUsuario().getIdUsuario()));
+    }
+
+    /**
      * SCRUM-33: solo una reserva pendiente se confirma (reserva inmediata,
      * aprobacion del anfitrion o pago). El bloqueo de las fechas lo hace
      * DisponibilidadService.confirmarReservaYBloquear, que llama a este metodo.

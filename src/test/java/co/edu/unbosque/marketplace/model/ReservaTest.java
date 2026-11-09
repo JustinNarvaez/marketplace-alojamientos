@@ -3,7 +3,9 @@ package co.edu.unbosque.marketplace.model;
 import co.edu.unbosque.marketplace.exception.ReservaNoCancelableException;
 import co.edu.unbosque.marketplace.exception.ReservaNoConfirmableException;
 import co.edu.unbosque.marketplace.exception.ReservaNoResenableException;
+import co.edu.unbosque.marketplace.model.enums.EstadoCuenta;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
+import co.edu.unbosque.marketplace.model.enums.TipoAlojamiento;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -93,5 +95,27 @@ class ReservaTest {
             assertThrows(ReservaNoCancelableException.class, reserva::cancelar, estado.name());
             assertEquals(estado, reserva.getEstado(), estado.name());
         }
+    }
+
+    // SCRUM-40: el detalle lo ven el huesped que reservo y el anfitrion del alojamiento.
+    @Test
+    void laVenSuHuespedYElAnfitrionDelAlojamientoNadieMas() {
+        Usuario huesped = new Usuario("Ana", "Lopez", "ana@ejemplo.com", "hash", null, OffsetDateTime.now(),
+                EstadoCuenta.ACTIVA);
+        huesped.setIdUsuario(7);
+        Usuario anfitrion = new Usuario("Luis", "Diaz", "luis@ejemplo.com", "hash", null, OffsetDateTime.now(),
+                EstadoCuenta.ACTIVA);
+        anfitrion.setIdUsuario(9);
+        Alojamiento alojamiento = new Alojamiento(new Anfitrion(anfitrion), TipoAlojamiento.CASA, (short) 4,
+                "Pereira", "Calle 10", null, OffsetDateTime.now());
+        Reserva reserva = new Reserva(new Huesped(huesped), alojamiento, null, LocalDate.of(2026, 12, 1),
+                LocalDate.of(2026, 12, 5), (short) 2, EstadoReserva.CONFIRMADA, OffsetDateTime.now(), "clave-1",
+                new BigDecimal("100000"), (short) 4, new BigDecimal("400000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, new BigDecimal("400000"));
+
+        assertTrue(reserva.esVisiblePara(7));
+        assertTrue(reserva.esVisiblePara(9));
+        assertFalse(reserva.esVisiblePara(8));
+        assertFalse(reserva.esVisiblePara(null));
     }
 }

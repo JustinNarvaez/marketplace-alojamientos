@@ -11,6 +11,8 @@ public record ReservaResponse(
         Integer idReserva,
         String estado,
         Integer idPublicacion,
+        // SCRUM-40: el detalle de la reserva muestra el nombre del alojamiento.
+        String tituloPublicacion,
         LocalDate fechaLlegada,
         LocalDate fechaSalida,
         Short numeroHuespedes,

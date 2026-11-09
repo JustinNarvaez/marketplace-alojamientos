@@ -61,6 +61,7 @@ export default function LayoutBase() {
                     {tieneRol('ANFITRION') && (
                         <>
                             <Button color="inherit" component={RouterLink} to="/mis-publicaciones">Mis publicaciones</Button>
+                            <Button color="inherit" component={RouterLink} to="/reservas-recibidas">Reservas recibidas</Button>
                             <Button color="inherit" component={RouterLink} to="/mis-publicaciones/nueva">Publicar</Button>
                         </>
                     )}

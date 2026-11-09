@@ -2,6 +2,7 @@ package co.edu.unbosque.marketplace.controller;
 
 import co.edu.unbosque.marketplace.dto.CrearReservaRequest;
 import co.edu.unbosque.marketplace.dto.ReservaResponse;
+import co.edu.unbosque.marketplace.dto.ReservaResumenResponse;
 import co.edu.unbosque.marketplace.service.ReservaService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,7 @@ class ReservaControllerTest {
         LocalDate llegada = LocalDate.now().plusDays(10);
         CrearReservaRequest solicitud = new CrearReservaRequest(1, llegada, llegada.plusDays(3), (short) 2,
                 null, "clave-123");
-        ReservaResponse esperada = new ReservaResponse(42, "CONFIRMADA", 1, llegada, llegada.plusDays(3),
+        ReservaResponse esperada = new ReservaResponse(42, "CONFIRMADA", 1, "Frente al mar", llegada, llegada.plusDays(3),
                 (short) 2, 3, new BigDecimal("100000"), new BigDecimal("300000"), new BigDecimal("50000"),
                 new BigDecimal("30000"), List.of(), BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("380000"),
                 OffsetDateTime.now());
@@ -48,5 +49,26 @@ class ReservaControllerTest {
 
         assertEquals(HttpStatus.CREATED, respuesta.getStatusCode());
         assertEquals(esperada, respuesta.getBody());
+    }
+
+    // SCRUM-40: los tres endpoints le pasan al servicio el usuario de la sesion.
+    @Test
+    void consultasConElUsuarioDeLaSesion() {
+        ReservaController controller = new ReservaController(reservaService);
+        LocalDate llegada = LocalDate.now().plusDays(10);
+        ReservaResumenResponse fila = new ReservaResumenResponse(42, 1, "Frente al mar", "Cartagena", llegada,
+                llegada.plusDays(3), (short) 2, new BigDecimal("380000"), "CONFIRMADA", "Ana Lopez");
+        ReservaResponse detalle = new ReservaResponse(42, "CONFIRMADA", 1, "Frente al mar", llegada,
+                llegada.plusDays(3), (short) 2, 3, new BigDecimal("100000"), new BigDecimal("300000"),
+                new BigDecimal("50000"), new BigDecimal("30000"), List.of(), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("380000"), OffsetDateTime.now());
+        when(principal.getName()).thenReturn("usuario@ejemplo.com");
+        when(reservaService.listarMias("usuario@ejemplo.com")).thenReturn(List.of(fila));
+        when(reservaService.listarRecibidas("usuario@ejemplo.com")).thenReturn(List.of());
+        when(reservaService.consultar("usuario@ejemplo.com", 42)).thenReturn(detalle);
+
+        assertEquals(List.of(fila), controller.listarMias(principal));
+        assertEquals(List.of(), controller.listarRecibidas(principal));
+        assertEquals(detalle, controller.consultar(42, principal));
     }
 }

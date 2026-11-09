@@ -18,6 +18,12 @@ public interface ReservaRepository extends JpaRepository<Reserva, Integer> {
     // imposible, pero gratis de evitar).
     Optional<Reserva> findByClaveIdempotenciaAndHuesped_IdUsuario(String claveIdempotencia, Integer idHuesped);
 
+    // SCRUM-40, escenario 1: "Mis reservas", la proxima llegada primero.
+    List<Reserva> findByHuesped_IdUsuarioOrderByFechaLlegadaDesc(Integer idHuesped);
+
+    // SCRUM-40, escenario 3: solo las reservas de los alojamientos del anfitrion.
+    List<Reserva> findByAlojamiento_Anfitrion_IdUsuarioOrderByFechaLlegadaDesc(Integer idAnfitrion);
+
     // SCRUM-43: la reserva solo si es del huesped de la sesion (si no, 404).
     Optional<Reserva> findByIdReservaAndHuesped_IdUsuario(Integer idReserva, Integer idHuesped);
 
