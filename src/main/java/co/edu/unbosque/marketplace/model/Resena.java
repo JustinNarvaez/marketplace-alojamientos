@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.model;
 
+import co.edu.unbosque.marketplace.exception.CambioVisibilidadResenaInvalidoException;
 import jakarta.persistence.*;
 
 import java.time.OffsetDateTime;
@@ -33,6 +34,22 @@ public class Resena {
     }
 
     protected Resena(){}
+
+    // SCRUM-50, escenario 1: deja de mostrarse pero se conserva para auditoria.
+    public void ocultar() {
+        if (Boolean.TRUE.equals(oculta)) {
+            throw new CambioVisibilidadResenaInvalidoException("Esta reseña ya está oculta.");
+        }
+        oculta = true;
+    }
+
+    // SCRUM-50, escenario 2: vuelve a ser visible.
+    public void restablecer() {
+        if (!Boolean.TRUE.equals(oculta)) {
+            throw new CambioVisibilidadResenaInvalidoException("Esta reseña ya está visible.");
+        }
+        oculta = false;
+    }
 
     public Integer getIdResena() {
         return idResena;

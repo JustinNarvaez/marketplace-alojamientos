@@ -10,25 +10,31 @@ servers:
 tags:
 - name: Reportes
   description: "Reportes de gestión en PDF o Excel, solo para ADMINISTRADOR (SCRUM-53)."
-- name: Auditoría
-  description: "Eventos de log_auditoria, solo para ADMINISTRADOR (SCRUM-51)."
 - name: Autenticación
   description: "Registro, inicio de sesión y recuperación de cuenta. Todo público\
     \ (SCRUM-22)."
-- name: Servicios
-  description: "Catálogo de servicios adicionales de un alojamiento (ej. WiFi, parqueadero)."
-- name: Publicaciones
-  description: Publicaciones de alojamientos del anfitrión (SCRUM-27).
 - name: Servicios adicionales
   description: Extras con precio que ofrece cada publicación (SCRUM-37).
 - name: Mi cuenta
   description: Perfil y estado de la cuenta del usuario autenticado (SCRUM-25/26).
-- name: Disponibilidad
-  description: Calendario de disponibilidad del anfitrión (SCRUM-31).
 - name: Políticas de cancelación
   description: Políticas que el anfitrión asocia a su publicación (SCRUM-42).
 - name: Cotizaciones
   description: Cotización de una estancia con desglose de tarifas (SCRUM-36).
+- name: Administración de reseñas
+  description: Moderación de reseñas por el administrador (SCRUM-50).
+- name: Auditoría
+  description: "Eventos de log_auditoria, solo para ADMINISTRADOR (SCRUM-51)."
+- name: Servicios
+  description: "Catálogo de servicios adicionales de un alojamiento (ej. WiFi, parqueadero)."
+- name: Publicaciones
+  description: Publicaciones de alojamientos del anfitrión (SCRUM-27).
+- name: Administración de publicaciones
+  description: Moderación de publicaciones por el administrador (SCRUM-48).
+- name: Búsqueda
+  description: Búsqueda pública de alojamientos con filtros (SCRUM-34).
+- name: Disponibilidad
+  description: Calendario de disponibilidad del anfitrión (SCRUM-31).
 - name: Administración de usuarios
   description: Moderación de cuentas por el administrador (SCRUM-49).
 - name: Notificaciones
@@ -962,6 +968,127 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/admin/resenas/{idResena}/visibilidad:
+    patch:
+      tags:
+      - Administración de reseñas
+      summary: Ocultar o restablecer una reseña
+      description: Solo ADMINISTRADOR. Oculta deja de mostrarse pero se conserva;
+        queda en auditoría con el motivo.
+      operationId: cambiarVisibilidad
+      parameters:
+      - name: idResena
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisibilidadResenaRequest"
+        required: true
+      responses:
+        "200":
+          description: Visibilidad actualizada
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResenaAdminResponse"
+        "400":
+          description: Falta el motivo o la decisión
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: El usuario autenticado no es ADMINISTRADOR
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La reseña no existe
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Ya estaba en ese estado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/admin/publicaciones/{idPublicacion}/bloqueo:
+    patch:
+      tags:
+      - Administración de publicaciones
+      summary: Bloquear o desbloquear una publicación
+      description: Solo ADMINISTRADOR. Bloqueada deja de verse; las reservas se conservan
+        para revisión manual. Se notifica al anfitrión y queda en auditoría con el
+        motivo.
+      operationId: cambiarBloqueo
+      parameters:
+      - name: idPublicacion
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BloqueoPublicacionRequest"
+        required: true
+      responses:
+        "200":
+          description: Estado actualizado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PublicacionAdminResponse"
+        "400":
+          description: Falta el motivo o la decisión
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: El usuario autenticado no es ADMINISTRADOR
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La publicación no existe
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Ya estaba en ese estado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/politicas-cancelacion:
     get:
       tags:
@@ -1199,6 +1326,83 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/listings/busqueda:
+    get:
+      tags:
+      - Búsqueda
+      summary: Buscar alojamientos
+      description: "Pública, sin sesión. Todos los filtros son opcionales. Solo publicaciones\
+        \ ACTIVAS."
+      operationId: buscar
+      parameters:
+      - name: ciudad
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: llegada
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: salida
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: huespedes
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+      - name: tipo
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - CASA
+          - APARTAMENTO
+          - HABITACION
+          - CABANA
+          - FINCA
+      - name: precioMinimo
+        in: query
+        required: false
+        schema:
+          type: number
+      - name: precioMaximo
+        in: query
+        required: false
+        schema:
+          type: number
+      - name: servicios
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: Resultados que cumplen todos los filtros aplicados (vacío si
+            ninguno coincide)
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ResultadoBusquedaResponse"
+        "400":
+          description: Rango de fechas inválido o un parámetro mal formado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/admin/usuarios:
     get:
       tags:
@@ -1233,6 +1437,54 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PaginaResponseUsuarioAdminResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: El usuario autenticado no es ADMINISTRADOR
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/admin/resenas:
+    get:
+      tags:
+      - Administración de reseñas
+      summary: Listar reseñas
+      description: Solo ADMINISTRADOR. Sin 'oculta' trae visibles y ocultas.
+      operationId: listar_6
+      parameters:
+      - name: oculta
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - name: pagina
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: tamano
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: Página de reseñas
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PaginaResponseResenaAdminResponse"
         "401":
           description: Falta el token o ya venció
           content:
@@ -1286,6 +1538,65 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: El usuario autenticado no es ADMINISTRADOR
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/admin/publicaciones:
+    get:
+      tags:
+      - Administración de publicaciones
+      summary: Listar publicaciones
+      description: Solo ADMINISTRADOR. Busca por título y filtra por estado.
+      operationId: listar_7
+      parameters:
+      - name: busqueda
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: estado
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - BORRADOR
+          - PENDIENTE_REVISION
+          - ACTIVA
+          - PAUSADA
+          - BLOQUEADA
+      - name: pagina
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: tamano
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: Página de publicaciones
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PaginaResponsePublicacionAdminResponse"
         "401":
           description: Falta el token o ya venció
           content:
@@ -1946,6 +2257,72 @@ components:
         fechaRegistro:
           type: string
           format: date-time
+    VisibilidadResenaRequest:
+      type: object
+      properties:
+        oculta:
+          type: boolean
+        motivo:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - motivo
+      - oculta
+    ResenaAdminResponse:
+      type: object
+      properties:
+        idResena:
+          type: integer
+          format: int32
+        idPublicacion:
+          type: integer
+          format: int32
+        tituloPublicacion:
+          type: string
+        autor:
+          type: string
+        calificacion:
+          type: integer
+          format: int32
+        comentario:
+          type: string
+        fechaPublicacion:
+          type: string
+          format: date-time
+        oculta:
+          type: boolean
+    BloqueoPublicacionRequest:
+      type: object
+      properties:
+        bloqueada:
+          type: boolean
+        motivo:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - bloqueada
+      - motivo
+    PublicacionAdminResponse:
+      type: object
+      properties:
+        idPublicacion:
+          type: integer
+          format: int32
+        titulo:
+          type: string
+        ciudad:
+          type: string
+        correoAnfitrion:
+          type: string
+        estado:
+          type: string
+        precioNoche:
+          type: number
+        reservasFuturas:
+          type: integer
+          format: int64
     PerfilUsuarioResponse:
       type: object
       properties:
@@ -2080,6 +2457,27 @@ components:
           type: number
         estado:
           type: string
+    ResultadoBusquedaResponse:
+      type: object
+      properties:
+        idPublicacion:
+          type: integer
+          format: int32
+        titulo:
+          type: string
+        ciudad:
+          type: string
+        tipoAlojamiento:
+          type: string
+        capacidad:
+          type: integer
+          format: int32
+        precioNoche:
+          type: number
+        imagenPortada:
+          type:
+          - string
+          - "null"
     PaginaResponseUsuarioAdminResponse:
       type: object
       properties:
@@ -2087,6 +2485,44 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UsuarioAdminResponse"
+        pagina:
+          type: integer
+          format: int32
+        tamano:
+          type: integer
+          format: int32
+        totalElementos:
+          type: integer
+          format: int64
+        totalPaginas:
+          type: integer
+          format: int32
+    PaginaResponseResenaAdminResponse:
+      type: object
+      properties:
+        contenido:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResenaAdminResponse"
+        pagina:
+          type: integer
+          format: int32
+        tamano:
+          type: integer
+          format: int32
+        totalElementos:
+          type: integer
+          format: int64
+        totalPaginas:
+          type: integer
+          format: int32
+    PaginaResponsePublicacionAdminResponse:
+      type: object
+      properties:
+        contenido:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicacionAdminResponse"
         pagina:
           type: integer
           format: int32

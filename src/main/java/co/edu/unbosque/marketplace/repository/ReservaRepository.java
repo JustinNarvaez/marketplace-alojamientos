@@ -35,4 +35,8 @@ public interface ReservaRepository extends JpaRepository<Reserva, Integer> {
     List<Reserva> findByAlojamiento_IdAlojamientoAndEstadoInAndFechaLlegadaBeforeAndFechaSalidaAfter(
             Integer idAlojamiento, Collection<EstadoReserva> estados,
             LocalDate salida, LocalDate llegada);
+
+    // SCRUM-48, escenario 2: reservas que siguen vigentes al bloquear.
+    long countByPublicacion_IdPublicacionAndEstadoInAndFechaSalidaAfter(
+            Integer idPublicacion, Collection<EstadoReserva> estados, LocalDate fecha);
 }
