@@ -111,6 +111,16 @@ class PublicacionControllerTest {
         assertEquals(esperada, controller.obtenerParaHuesped(1));
     }
 
+    // SCRUM-47
+    @Test
+    void consultarResenasDelegaConElId() {
+        PublicacionController controller = new PublicacionController(publicacionService);
+        ResumenResenasResponse esperada = new ResumenResenasResponse(null, 0, List.of());
+        when(publicacionService.resenasParaHuesped(1)).thenReturn(esperada);
+
+        assertEquals(esperada, controller.consultarResenas(1));
+    }
+
     @Test
     void cambiarEstadoDelegaConElIdElCorreoYLaIp() {
         PublicacionController controller = new PublicacionController(publicacionService);

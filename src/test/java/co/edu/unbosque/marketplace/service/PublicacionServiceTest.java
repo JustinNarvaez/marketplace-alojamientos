@@ -505,6 +505,34 @@ class PublicacionServiceTest {
         verify(resenaService, never()).resumenDe(any());
     }
 
+    // ===== SCRUM-47: solo las resenas =====
+
+    @Test
+    void resenasParaHuespedDevuelveElResumenDeResenaService() {
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(unaPublicacion(1, 20, "Cartagena")));
+        ResumenResenasResponse resenas = new ResumenResenasResponse(new BigDecimal("4.5"), 2, List.of());
+        when(resenaService.resumenDe(1)).thenReturn(resenas);
+
+        assertEquals(resenas, publicacionService.resenasParaHuesped(1));
+    }
+
+    @Test
+    void resenasDeUnaPublicacionNoPublicadaNoSeMuestran() {
+        Publicacion publicacion = unaPublicacion(1, 20, "Cartagena");
+        publicacion.setEstado(EstadoPublicacion.BLOQUEADA);
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+
+        assertThrows(PublicacionNoDisponibleException.class, () -> publicacionService.resenasParaHuesped(1));
+        verify(resenaService, never()).resumenDe(any());
+    }
+
+    @Test
+    void resenasDeUnaPublicacionQueNoExisteResponde404() {
+        when(publicacionRepository.findById(99)).thenReturn(Optional.empty());
+
+        assertThrows(PublicacionNoEncontradaException.class, () -> publicacionService.resenasParaHuesped(99));
+    }
+
     @Test
     void obtenerParaHuespedDeUnaPublicacionQueNoExisteResponde404() {
         when(publicacionRepository.findById(99)).thenReturn(Optional.empty());
