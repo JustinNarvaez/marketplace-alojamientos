@@ -25,16 +25,16 @@ class BusquedaControllerTest {
     @Test
     void buscarDelegaConTodosLosFiltros() {
         BusquedaController controller = new BusquedaController(busquedaService);
-        LocalDate from = LocalDate.of(2027, 1, 1);
-        LocalDate to = LocalDate.of(2027, 1, 5);
-        FiltrosBusqueda esperados = new FiltrosBusqueda("Bogota", from, to, (short) 2, TipoAlojamiento.APARTAMENTO,
+        LocalDate llegada = LocalDate.of(2027, 1, 1);
+        LocalDate salida = LocalDate.of(2027, 1, 5);
+        FiltrosBusqueda esperados = new FiltrosBusqueda("Bogota", llegada, salida, (short) 2, TipoAlojamiento.APARTAMENTO,
                 new BigDecimal("100000"), new BigDecimal("300000"), List.of(1, 2));
         List<ResultadoBusquedaResponse> resultado = List.of(
                 new ResultadoBusquedaResponse(1, "Casa", "Bogota", "APARTAMENTO", (short) 4,
                         new BigDecimal("150000"), null));
         when(busquedaService.buscar(esperados)).thenReturn(resultado);
 
-        List<ResultadoBusquedaResponse> respuesta = controller.buscar("Bogota", from, to, (short) 2,
+        List<ResultadoBusquedaResponse> respuesta = controller.buscar("Bogota", llegada, salida, (short) 2,
                 TipoAlojamiento.APARTAMENTO, new BigDecimal("100000"), new BigDecimal("300000"), List.of(1, 2));
 
         assertEquals(resultado, respuesta);

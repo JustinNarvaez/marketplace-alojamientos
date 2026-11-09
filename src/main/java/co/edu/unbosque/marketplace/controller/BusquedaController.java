@@ -38,19 +38,20 @@ public class BusquedaController {
             description = "Pública, sin sesión. Todos los filtros son opcionales. Solo publicaciones ACTIVAS.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Resultados que cumplen todos los filtros aplicados (vacío si ninguno coincide)"),
-            @ApiResponse(responseCode = "400", description = "Rango de fechas inválido",
+            @ApiResponse(responseCode = "400", description = "Rango de fechas inválido o un parámetro mal formado",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
     })
-    @GetMapping("/search")
+    @GetMapping("/busqueda")
     public List<ResultadoBusquedaResponse> buscar(
-            @RequestParam(required = false) String city,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false) Short guests,
-            @RequestParam(required = false) TipoAlojamiento type,
-            @RequestParam(required = false) BigDecimal minPrice,
-            @RequestParam(required = false) BigDecimal maxPrice,
-            @RequestParam(required = false) List<Integer> amenities) {
-        return busquedaService.buscar(new FiltrosBusqueda(city, from, to, guests, type, minPrice, maxPrice, amenities));
+            @RequestParam(required = false) String ciudad,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate llegada,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate salida,
+            @RequestParam(required = false) Short huespedes,
+            @RequestParam(required = false) TipoAlojamiento tipo,
+            @RequestParam(required = false) BigDecimal precioMinimo,
+            @RequestParam(required = false) BigDecimal precioMaximo,
+            @RequestParam(required = false, name = "servicios") List<Integer> idsServicios) {
+        return busquedaService.buscar(new FiltrosBusqueda(ciudad, llegada, salida, huespedes, tipo,
+                precioMinimo, precioMaximo, idsServicios));
     }
 }

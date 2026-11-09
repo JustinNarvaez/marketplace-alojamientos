@@ -51,17 +51,17 @@ function hoy(): string {
 }
 
 interface Filtros {
-    city: string
-    from: string
-    to: string
-    guests: string
-    type: string
-    minPrice: string
-    maxPrice: string
+    ciudad: string
+    llegada: string
+    salida: string
+    huespedes: string
+    tipo: string
+    precioMinimo: string
+    precioMaximo: string
 }
 
 const FILTROS_VACIOS: Filtros = {
-    city: '', from: '', to: '', guests: '', type: '', minPrice: '', maxPrice: '',
+    ciudad: '', llegada: '', salida: '', huespedes: '', tipo: '', precioMinimo: '', precioMaximo: '',
 }
 
 // SCRUM-34: busqueda publica, sin sesion. El detalle de cada resultado
@@ -83,7 +83,7 @@ export default function Inicio() {
     }, [])
 
     // Escenario 1 (fechas) en pantalla: se marca antes de llamar al backend, que igual lo valida.
-    const errorSalida = intentoEnviar && filtros.from !== '' && filtros.to !== '' && filtros.to <= filtros.from
+    const errorSalida = intentoEnviar && filtros.llegada !== '' && filtros.salida !== '' && filtros.salida <= filtros.llegada
         ? 'La salida debe ser posterior a la llegada.' : null
 
     const cambiar = (campo: keyof Filtros) => (valor: string) =>
@@ -97,23 +97,23 @@ export default function Inicio() {
         evento.preventDefault()
         setIntentoEnviar(true)
         setError(null)
-        if (filtros.from !== '' && filtros.to !== '' && filtros.to <= filtros.from) {
+        if (filtros.llegada !== '' && filtros.salida !== '' && filtros.salida <= filtros.llegada) {
             return
         }
 
         const parametros = new URLSearchParams()
-        if (filtros.city.trim() !== '') parametros.set('city', filtros.city.trim())
-        if (filtros.from !== '') parametros.set('from', filtros.from)
-        if (filtros.to !== '') parametros.set('to', filtros.to)
-        if (filtros.guests !== '') parametros.set('guests', filtros.guests)
-        if (filtros.type !== '') parametros.set('type', filtros.type)
-        if (filtros.minPrice !== '') parametros.set('minPrice', filtros.minPrice)
-        if (filtros.maxPrice !== '') parametros.set('maxPrice', filtros.maxPrice)
-        if (seleccionados.length > 0) parametros.set('amenities', seleccionados.join(','))
+        if (filtros.ciudad.trim() !== '') parametros.set('ciudad', filtros.ciudad.trim())
+        if (filtros.llegada !== '') parametros.set('llegada', filtros.llegada)
+        if (filtros.salida !== '') parametros.set('salida', filtros.salida)
+        if (filtros.huespedes !== '') parametros.set('huespedes', filtros.huespedes)
+        if (filtros.tipo !== '') parametros.set('tipo', filtros.tipo)
+        if (filtros.precioMinimo !== '') parametros.set('precioMinimo', filtros.precioMinimo)
+        if (filtros.precioMaximo !== '') parametros.set('precioMaximo', filtros.precioMaximo)
+        if (seleccionados.length > 0) parametros.set('servicios', seleccionados.join(','))
 
         setBuscando(true)
         try {
-            const respuesta = await pedir<ResultadoBusqueda[]>(`/listings/search?${parametros.toString()}`)
+            const respuesta = await pedir<ResultadoBusqueda[]>(`/listings/busqueda?${parametros.toString()}`)
             setResultados(respuesta)
         } catch (err) {
             setResultados(null)
@@ -136,31 +136,31 @@ export default function Inicio() {
 
             <Stack component="form" spacing={2} onSubmit={(e: FormEvent) => void buscar(e)}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                    <TextField label="Ciudad" value={filtros.city}
-                               onChange={(e) => cambiar('city')(e.target.value)} fullWidth />
-                    <TextField label="Llegada" type="date" value={filtros.from}
-                               onChange={(e) => cambiar('from')(e.target.value)}
+                    <TextField label="Ciudad" value={filtros.ciudad}
+                               onChange={(e) => cambiar('ciudad')(e.target.value)} fullWidth />
+                    <TextField label="Llegada" type="date" value={filtros.llegada}
+                               onChange={(e) => cambiar('llegada')(e.target.value)}
                                slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: hoy() } }} fullWidth />
-                    <TextField label="Salida" type="date" value={filtros.to}
-                               onChange={(e) => cambiar('to')(e.target.value)}
-                               slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: filtros.from || hoy() } }}
+                    <TextField label="Salida" type="date" value={filtros.salida}
+                               onChange={(e) => cambiar('salida')(e.target.value)}
+                               slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: filtros.llegada || hoy() } }}
                                error={Boolean(errorSalida)} helperText={errorSalida ?? ' '} fullWidth />
-                    <TextField label="Huéspedes" type="number" value={filtros.guests}
-                               onChange={(e) => cambiar('guests')(e.target.value)}
+                    <TextField label="Huéspedes" type="number" value={filtros.huespedes}
+                               onChange={(e) => cambiar('huespedes')(e.target.value)}
                                slotProps={{ htmlInput: { min: 1 } }} fullWidth />
                 </Stack>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                    <TextField label="Tipo" select value={filtros.type}
-                               onChange={(e) => cambiar('type')(e.target.value)} fullWidth>
+                    <TextField label="Tipo" select value={filtros.tipo}
+                               onChange={(e) => cambiar('tipo')(e.target.value)} fullWidth>
                         <MenuItem value="">Cualquiera</MenuItem>
                         {TIPOS.map((tipo) => (
                             <MenuItem key={tipo.valor} value={tipo.valor}>{tipo.etiqueta}</MenuItem>
                         ))}
                     </TextField>
-                    <TextField label="Precio mínimo por noche" type="number" value={filtros.minPrice}
-                               onChange={(e) => cambiar('minPrice')(e.target.value)} fullWidth />
-                    <TextField label="Precio máximo por noche" type="number" value={filtros.maxPrice}
-                               onChange={(e) => cambiar('maxPrice')(e.target.value)} fullWidth />
+                    <TextField label="Precio mínimo por noche" type="number" value={filtros.precioMinimo}
+                               onChange={(e) => cambiar('precioMinimo')(e.target.value)} fullWidth />
+                    <TextField label="Precio máximo por noche" type="number" value={filtros.precioMaximo}
+                               onChange={(e) => cambiar('precioMaximo')(e.target.value)} fullWidth />
                 </Stack>
 
                 {servicios.length > 0 && (

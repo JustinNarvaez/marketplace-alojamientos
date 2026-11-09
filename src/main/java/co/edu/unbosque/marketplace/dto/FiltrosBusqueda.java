@@ -8,12 +8,12 @@ import java.util.List;
 
 // SCRUM-34: todos los filtros son opcionales (mismo patron que FiltrosAuditoria).
 public record FiltrosBusqueda(
-        String city,
-        LocalDate from,
-        LocalDate to,
-        Short guests,
-        TipoAlojamiento type,
-        BigDecimal minPrice,
-        BigDecimal maxPrice,
-        List<Integer> amenities
+        String ciudad,
+        LocalDate llegada,
+        LocalDate salida,
+        Short huespedes,
+        TipoAlojamiento tipo,
+        BigDecimal precioMinimo,
+        BigDecimal precioMaximo,
+        List<Integer> idsServicios
 ) {}

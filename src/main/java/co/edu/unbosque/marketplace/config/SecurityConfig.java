@@ -59,8 +59,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         // SCRUM-34: la busqueda es publica, igual que Inicio.tsx; el
                         // catalogo de servicios tambien, para que el filtro de
-                        // amenities funcione sin sesion (es de solo lectura, sin dato sensible).
-                        .requestMatchers(HttpMethod.GET, "/api/listings/search").permitAll()
+                        // servicios funcione sin sesion (es de solo lectura, sin dato sensible).
+                        .requestMatchers(HttpMethod.GET, "/api/listings/busqueda").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/servicios").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/servicios").hasRole("ADMINISTRADOR")
                         .requestMatchers(HttpMethod.POST, "/api/listings").hasRole("ANFITRION")

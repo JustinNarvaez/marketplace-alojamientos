@@ -26,9 +26,21 @@ import java.util.Map;
  * disponibilidad por fechas no se repite en Criteria: se reutiliza
  * DisponibilidadService.estaDisponible() (SCRUM-32/36) como post-filtro en
  * memoria sobre los candidatos que ya pasaron el resto de los filtros.
+ *
+ * Deuda conocida (senalada en revision del PR #35, no bloquea): con fechas,
+ * estaDisponible() hace 2 consultas por cada publicacion candidata y la
+ * respuesta no esta paginada. A la escala actual no es un problema; si el
+ * catalogo crece, conviene paginar y/o resolver la disponibilidad en una
+ * sola consulta.
  */
 @Service
 public class BusquedaService {
+
+    // Caracter de escape para el LIKE de ciudad: sin esto, un usuario que
+    // escriba "%" o "_" como ciudad obtiene comodines de SQL en vez de un
+    // texto literal (no es inyeccion, el parametro sigue enlazado, pero
+    // "%" devolveria todo).
+    private static final char ESCAPE_LIKE = '\\';
 
     private final PublicacionRepository publicacionRepository;
     private final ImagenRepository imagenRepository;
@@ -47,11 +59,11 @@ public class BusquedaService {
 
         List<Publicacion> candidatas = publicacionRepository.findAll(filtrosDe(filtros));
 
-        List<Publicacion> resultado = filtros.from() == null
+        List<Publicacion> resultado = filtros.llegada() == null
                 ? candidatas
                 : candidatas.stream()
                         .filter(publicacion -> disponibilidadService.estaDisponible(
-                                publicacion.getAlojamiento().getIdAlojamiento(), filtros.from(), filtros.to()))
+                                publicacion.getAlojamiento().getIdAlojamiento(), filtros.llegada(), filtros.salida()))
                         .toList();
 
         Map<Integer, String> portadas = portadasDe(resultado);
@@ -62,10 +74,10 @@ public class BusquedaService {
     // tiene que ser posterior a la llegada; aqui ademas las dos fechas
     // vienen juntas o ninguna, un rango de busqueda a medias no tiene sentido.
     private void validarFechas(FiltrosBusqueda filtros) {
-        if ((filtros.from() == null) != (filtros.to() == null)) {
+        if ((filtros.llegada() == null) != (filtros.salida() == null)) {
             throw new BusquedaInvalidaException("Si filtras por fechas, debes dar llegada y salida.");
         }
-        if (filtros.from() != null && !filtros.to().isAfter(filtros.from())) {
+        if (filtros.llegada() != null && !filtros.salida().isAfter(filtros.llegada())) {
             throw new BusquedaInvalidaException("La fecha de salida debe ser posterior a la de llegada.");
         }
     }
@@ -78,26 +90,26 @@ public class BusquedaService {
             condiciones.add(cb.equal(root.get("estado"), EstadoPublicacion.ACTIVA));
 
             var alojamiento = root.join("alojamiento");
-            if (filtros.city() != null && !filtros.city().isBlank()) {
-                String patron = "%" + filtros.city().trim().toLowerCase() + "%";
-                condiciones.add(cb.like(cb.lower(alojamiento.get("ciudad")), patron));
+            if (filtros.ciudad() != null && !filtros.ciudad().isBlank()) {
+                String patron = "%" + escaparComodines(filtros.ciudad().trim().toLowerCase()) + "%";
+                condiciones.add(cb.like(cb.lower(alojamiento.get("ciudad")), patron, ESCAPE_LIKE));
             }
-            if (filtros.type() != null) {
-                condiciones.add(cb.equal(alojamiento.get("tipoAlojamiento"), filtros.type()));
+            if (filtros.tipo() != null) {
+                condiciones.add(cb.equal(alojamiento.get("tipoAlojamiento"), filtros.tipo()));
             }
-            if (filtros.guests() != null) {
-                condiciones.add(cb.greaterThanOrEqualTo(alojamiento.get("capacidad"), filtros.guests()));
+            if (filtros.huespedes() != null) {
+                condiciones.add(cb.greaterThanOrEqualTo(alojamiento.get("capacidad"), filtros.huespedes()));
             }
-            if (filtros.minPrice() != null) {
-                condiciones.add(cb.greaterThanOrEqualTo(root.get("precioNoche"), filtros.minPrice()));
+            if (filtros.precioMinimo() != null) {
+                condiciones.add(cb.greaterThanOrEqualTo(root.get("precioNoche"), filtros.precioMinimo()));
             }
-            if (filtros.maxPrice() != null) {
-                condiciones.add(cb.lessThanOrEqualTo(root.get("precioNoche"), filtros.maxPrice()));
+            if (filtros.precioMaximo() != null) {
+                condiciones.add(cb.lessThanOrEqualTo(root.get("precioNoche"), filtros.precioMaximo()));
             }
-            if (filtros.amenities() != null && !filtros.amenities().isEmpty()) {
+            if (filtros.idsServicios() != null && !filtros.idsServicios().isEmpty()) {
                 // Un join nuevo por cada id pedido: exige que la publicacion
                 // tenga TODOS los servicios, no que tenga alguno (escenario 2).
-                for (Integer idServicio : filtros.amenities()) {
+                for (Integer idServicio : filtros.idsServicios()) {
                     Join<Publicacion, ?> servicios = root.join("servicios");
                     condiciones.add(cb.equal(servicios.get("idServicio"), idServicio));
                 }
@@ -105,6 +117,13 @@ public class BusquedaService {
             }
             return cb.and(condiciones.toArray(Predicate[]::new));
         };
+    }
+
+    // Escapa los comodines propios de LIKE para que el texto del usuario se
+    // busque literal. El backslash va primero: si no, escaparia los
+    // backslashes que acabamos de insertar para "%" y "_".
+    private static String escaparComodines(String texto) {
+        return texto.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     private Map<Integer, String> portadasDe(List<Publicacion> publicaciones) {

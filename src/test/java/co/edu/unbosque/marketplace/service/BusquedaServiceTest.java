@@ -125,10 +125,10 @@ class BusquedaServiceTest {
         return publicacionRepository.save(publicacion);
     }
 
-    private FiltrosBusqueda filtros(String city, LocalDate from, LocalDate to, Short guests,
-                                    TipoAlojamiento type, BigDecimal minPrice, BigDecimal maxPrice,
-                                    List<Integer> amenities) {
-        return new FiltrosBusqueda(city, from, to, guests, type, minPrice, maxPrice, amenities);
+    private FiltrosBusqueda filtros(String ciudad, LocalDate llegada, LocalDate salida, Short huespedes,
+                                    TipoAlojamiento tipo, BigDecimal precioMinimo, BigDecimal precioMaximo,
+                                    List<Integer> idsServicios) {
+        return new FiltrosBusqueda(ciudad, llegada, salida, huespedes, tipo, precioMinimo, precioMaximo, idsServicios);
     }
 
     private List<Integer> idsDe(List<ResultadoBusquedaResponse> resultados) {
@@ -189,6 +189,16 @@ class BusquedaServiceTest {
         // El apartamento de ciudad uno solo tiene WiFi, no los dos a la vez.
         assertTrue(idsConAmbos.contains(casaUno.getIdPublicacion()));
         assertFalse(idsConAmbos.contains(apartamentoUno.getIdPublicacion()));
+    }
+
+    // Regresion (revision del PR #35): "%" o "_" en la ciudad son comodines
+    // de SQL. Sin escaparlos, "%" devuelve todo en vez de no encontrar nada.
+    @Test
+    void unComodinDeSqlEnLaCiudadSeBuscaComoTextoLiteral() {
+        List<ResultadoBusquedaResponse> resultados = busquedaService.buscar(
+                filtros("%", null, null, null, null, null, null, null));
+
+        assertEquals(List.of(), resultados);
     }
 
     @Test
