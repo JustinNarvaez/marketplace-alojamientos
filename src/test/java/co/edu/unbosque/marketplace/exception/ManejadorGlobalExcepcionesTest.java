@@ -182,6 +182,14 @@ class ManejadorGlobalExcepcionesTest {
     }
 
     @Test
+    void politicaCancelacionNoEncontradaResponde400() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new PoliticaCancelacionNoEncontradaException());
+
+        assertEquals(HttpStatus.BAD_REQUEST, respuesta.getStatusCode());
+        assertEquals("La política de cancelación seleccionada no existe.", respuesta.getBody().mensaje());
+    }
+
+    @Test
     void periodoNoDisponibleResponde409() {
         ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new PeriodoNoDisponibleException());
 
