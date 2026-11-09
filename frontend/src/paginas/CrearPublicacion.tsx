@@ -23,6 +23,13 @@ interface Servicio {
     categoria: string | null
 }
 
+// SCRUM-42: GET /api/politicas-cancelacion
+interface PoliticaCancelacion {
+    idPolitica: number
+    nombre: string
+    descripcion: string
+}
+
 interface RespuestaPublicacion {
     idPublicacion: number
     titulo: string
@@ -40,6 +47,7 @@ interface PublicacionExistente {
     ubicacion: string | null
     precioNoche: number
     tarifaLimpieza: number
+    politicaCancelacion: string
     servicios: Servicio[]
     reglas: string[]
     imagenes: string[]
@@ -116,6 +124,9 @@ export default function CrearPublicacion() {
     const [formulario, setFormulario] = useState<Formulario>(FORMULARIO_VACIO)
     const [servicios, setServicios] = useState<Servicio[]>([])
     const [seleccionados, setSeleccionados] = useState<number[]>([])
+    const [politicas, setPoliticas] = useState<PoliticaCancelacion[]>([])
+    // Nombre de la politica elegida; vacio = la de por defecto del backend (FLEXIBLE)
+    const [politica, setPolitica] = useState('')
     const [intentoEnviar, setIntentoEnviar] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [creada, setCreada] = useState<RespuestaPublicacion | null>(null)
@@ -127,6 +138,13 @@ export default function CrearPublicacion() {
         pedir<Servicio[]>('/servicios')
             .then(setServicios)
             .catch(() => setServicios([]))
+    }, [])
+
+    // SCRUM-42: politicas que el anfitrion puede asociar a la publicacion
+    useEffect(() => {
+        pedir<PoliticaCancelacion[]>('/politicas-cancelacion')
+            .then(setPoliticas)
+            .catch(() => setPoliticas([]))
     }, [])
 
     // SCRUM-28: precarga los datos actuales de la publicacion a editar.
@@ -148,12 +166,16 @@ export default function CrearPublicacion() {
                     imagenes: publicacion.imagenes.join('\n'),
                 })
                 setSeleccionados(publicacion.servicios.map((servicio) => servicio.idServicio))
+                setPolitica(publicacion.politicaCancelacion)
             })
             .catch((err) => setError(err instanceof ErrorApi ? err.message : 'No pudimos cargar la publicación.'))
             .finally(() => setCargando(false))
     }, [editando, id])
 
     const errores: Errores = intentoEnviar ? erroresDe(formulario) : {}
+    // Sin eleccion explicita se muestra FLEXIBLE, que es la que asigna el backend.
+    const politicaElegida = politica || 'FLEXIBLE'
+    const descripcionPolitica = politicas.find((p) => p.nombre === politicaElegida)?.descripcion ?? ' '
 
     const cambiar = (campo: keyof Formulario) => (valor: string) =>
         setFormulario((actual) => ({ ...actual, [campo]: valor }))
@@ -180,6 +202,7 @@ export default function CrearPublicacion() {
             idsServicios: seleccionados,
             reglas: lineas(formulario.reglas),
             imagenes: lineas(formulario.imagenes),
+            idPoliticaCancelacion: politicas.find((p) => p.nombre === politicaElegida)?.idPolitica ?? null,
         }
 
         setEnviando(true)
@@ -196,6 +219,7 @@ export default function CrearPublicacion() {
             setCreada(respuesta)
             setFormulario(FORMULARIO_VACIO)
             setSeleccionados([])
+            setPolitica('')
             setIntentoEnviar(false)
         } catch (err) {
             setError(err instanceof ErrorApi ? err.message : 'Ocurrió un error. Intenta más tarde')
@@ -255,6 +279,23 @@ export default function CrearPublicacion() {
                     <TextField {...campo('precioNoche', 'Precio por noche (COP)')} type="number" required />
                     <TextField {...campo('tarifaLimpieza', 'Tarifa de limpieza (COP)', 'Opcional')} type="number" />
                 </Stack>
+
+                {politicas.length > 0 && (
+                    <TextField
+                        select
+                        label="Política de cancelación"
+                        value={politicaElegida}
+                        onChange={(e) => setPolitica(e.target.value)}
+                        helperText={descripcionPolitica}
+                        fullWidth
+                    >
+                        {politicas.map((p) => (
+                            <MenuItem key={p.idPolitica} value={p.nombre}>
+                                {p.nombre.charAt(0) + p.nombre.slice(1).toLowerCase()}
+                            </MenuItem>
+                        ))}
+                    </TextField>
+                )}
 
                 <FormLabel>Servicios</FormLabel>
                 <FormGroup row>

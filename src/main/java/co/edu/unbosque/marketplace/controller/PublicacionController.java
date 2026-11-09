@@ -48,10 +48,10 @@ public class PublicacionController {
     // El anfitrion sale del JWT (Principal), nunca del cuerpo: nadie puede
     // crear una publicacion a nombre de otro.
     @Operation(summary = "Crear una publicación",
-            description = "Solo un ANFITRION. La publicación queda en BORRADOR con la política FLEXIBLE.")
+            description = "Solo un ANFITRION. La publicación queda en BORRADOR; si no se elige política de cancelación, se usa FLEXIBLE.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Publicación creada en BORRADOR"),
-            @ApiResponse(responseCode = "400", description = "Datos inválidos (capacidad, precio, campos obligatorios) o servicio inexistente",
+            @ApiResponse(responseCode = "400", description = "Datos inválidos (capacidad, precio, campos obligatorios), servicio o política inexistente",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Falta el token o ya venció",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
