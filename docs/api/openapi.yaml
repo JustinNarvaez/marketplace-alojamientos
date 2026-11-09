@@ -21,6 +21,8 @@ tags:
   description: Políticas que el anfitrión asocia a su publicación (SCRUM-42).
 - name: Cotizaciones
   description: Cotización de una estancia con desglose de tarifas (SCRUM-36).
+- name: Administración de reseñas
+  description: Moderación de reseñas por el administrador (SCRUM-50).
 - name: Auditoría
   description: "Eventos de log_auditoria, solo para ADMINISTRADOR (SCRUM-51)."
 - name: Servicios
@@ -964,6 +966,66 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/admin/resenas/{idResena}/visibilidad:
+    patch:
+      tags:
+      - Administración de reseñas
+      summary: Ocultar o restablecer una reseña
+      description: Solo ADMINISTRADOR. Oculta deja de mostrarse pero se conserva;
+        queda en auditoría con el motivo.
+      operationId: cambiarVisibilidad
+      parameters:
+      - name: idResena
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisibilidadResenaRequest"
+        required: true
+      responses:
+        "200":
+          description: Visibilidad actualizada
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResenaAdminResponse"
+        "400":
+          description: Falta el motivo o la decisión
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: El usuario autenticado no es ADMINISTRADOR
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La reseña no existe
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Ya estaba en ese estado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/admin/publicaciones/{idPublicacion}/bloqueo:
     patch:
       tags:
@@ -1310,6 +1372,54 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/admin/resenas:
+    get:
+      tags:
+      - Administración de reseñas
+      summary: Listar reseñas
+      description: Solo ADMINISTRADOR. Sin 'oculta' trae visibles y ocultas.
+      operationId: listar_6
+      parameters:
+      - name: oculta
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - name: pagina
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: tamano
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: Página de reseñas
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PaginaResponseResenaAdminResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: El usuario autenticado no es ADMINISTRADOR
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/admin/reports/{tipo}:
     get:
       tags:
@@ -1369,7 +1479,7 @@ paths:
       - Administración de publicaciones
       summary: Listar publicaciones
       description: Solo ADMINISTRADOR. Busca por título y filtra por estado.
-      operationId: listar_6
+      operationId: listar_7
       parameters:
       - name: busqueda
         in: query
@@ -2068,6 +2178,41 @@ components:
         fechaRegistro:
           type: string
           format: date-time
+    VisibilidadResenaRequest:
+      type: object
+      properties:
+        oculta:
+          type: boolean
+        motivo:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - motivo
+      - oculta
+    ResenaAdminResponse:
+      type: object
+      properties:
+        idResena:
+          type: integer
+          format: int32
+        idPublicacion:
+          type: integer
+          format: int32
+        tituloPublicacion:
+          type: string
+        autor:
+          type: string
+        calificacion:
+          type: integer
+          format: int32
+        comentario:
+          type: string
+        fechaPublicacion:
+          type: string
+          format: date-time
+        oculta:
+          type: boolean
     BloqueoPublicacionRequest:
       type: object
       properties:
@@ -2240,6 +2385,25 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UsuarioAdminResponse"
+        pagina:
+          type: integer
+          format: int32
+        tamano:
+          type: integer
+          format: int32
+        totalElementos:
+          type: integer
+          format: int64
+        totalPaginas:
+          type: integer
+          format: int32
+    PaginaResponseResenaAdminResponse:
+      type: object
+      properties:
+        contenido:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResenaAdminResponse"
         pagina:
           type: integer
           format: int32

@@ -124,6 +124,16 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(CambioVisibilidadResenaInvalidoException.class)
+    public ResponseEntity<ErrorResponse> manejar(CambioVisibilidadResenaInvalidoException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(ResenaNoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> manejar(ResenaNoEncontradaException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(PoliticaCancelacionNoEncontradaException.class)
     public ResponseEntity<ErrorResponse> manejar(PoliticaCancelacionNoEncontradaException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
