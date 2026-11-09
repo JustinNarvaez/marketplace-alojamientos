@@ -9,6 +9,7 @@ import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
 import co.edu.unbosque.marketplace.dto.ServicioResponse;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
 import co.edu.unbosque.marketplace.exception.NoEsPropietarioException;
+import co.edu.unbosque.marketplace.exception.PoliticaCancelacionNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.PublicacionBloqueadaException;
 import co.edu.unbosque.marketplace.exception.PublicacionIncompletaException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoDisponibleException;
@@ -94,8 +95,10 @@ public class PublicacionService {
         // SecurityConfig ya exige el rol ANFITRION; esto es la fila de la tabla anfitrion.
         Anfitrion anfitrion = anfitrionRepository.findById(usuario.getIdUsuario())
                 .orElseThrow(CredencialesInvalidasException::new);
-        PoliticaCancelacion politica = politicaCancelacionRepository.findByNombre(POLITICA_POR_DEFECTO)
-                .orElseThrow(() -> new IllegalStateException("Falta la política " + POLITICA_POR_DEFECTO));
+        PoliticaCancelacion politica = request.idPoliticaCancelacion() == null
+                ? politicaCancelacionRepository.findByNombre(POLITICA_POR_DEFECTO)
+                        .orElseThrow(() -> new IllegalStateException("Falta la política " + POLITICA_POR_DEFECTO))
+                : politicaDe(request.idPoliticaCancelacion());
         Set<Servicio> servicios = serviciosDe(request.idsServicios());
 
         OffsetDateTime ahora = OffsetDateTime.now();
@@ -192,6 +195,10 @@ public class PublicacionService {
         }
 
         Set<Servicio> servicios = serviciosDe(request.idsServicios());
+        // SCRUM-42: igual que reservaInmediata, un null significa "no la toques".
+        if (request.idPoliticaCancelacion() != null) {
+            publicacion.setPoliticaCancelacion(politicaDe(request.idPoliticaCancelacion()));
+        }
 
         Alojamiento alojamiento = publicacion.getAlojamiento();
         alojamiento.setTipoAlojamiento(request.tipoAlojamiento());
@@ -251,6 +258,12 @@ public class PublicacionService {
         String estadoAnterior = publicacion.getEstado().name();
         String accion;
         if (nuevoEstado == EstadoPublicacion.ACTIVA) {
+            // SCRUM-42, escenario 3. La columna es NOT NULL, asi que hoy no
+            // deberia pasar; se valida igual para que la regla quede explicita.
+            if (publicacion.getPoliticaCancelacion() == null) {
+                throw new PublicacionIncompletaException(
+                        "No puedes activarla: elige una política de cancelación.");
+            }
             boolean sinImagenes = imagenRepository
                     .findByPublicacion_IdPublicacionOrderByOrdenAsc(idPublicacion).isEmpty();
             if (sinImagenes) {
@@ -269,6 +282,11 @@ public class PublicacionService {
                 new ServicioAuditoria.CambioEstado(estadoAnterior, publicacion.getEstado().name()), ipOrigen);
 
         return new EstadoPublicacionResponse(publicacion.getEstado().name());
+    }
+
+    private PoliticaCancelacion politicaDe(Integer idPolitica) {
+        return politicaCancelacionRepository.findById(idPolitica)
+                .orElseThrow(PoliticaCancelacionNoEncontradaException::new);
     }
 
     // Si piden un id que no existe, findAllById devuelve menos servicios que ids.

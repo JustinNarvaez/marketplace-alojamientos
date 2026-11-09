@@ -25,6 +25,8 @@ tags:
   description: Perfil y estado de la cuenta del usuario autenticado (SCRUM-25/26).
 - name: Disponibilidad
   description: Calendario de disponibilidad del anfitrión (SCRUM-31).
+- name: Políticas de cancelación
+  description: Políticas que el anfitrión asocia a su publicación (SCRUM-42).
 - name: Cotizaciones
   description: Cotización de una estancia con desglose de tarifas (SCRUM-36).
 - name: Notificaciones
@@ -508,8 +510,8 @@ paths:
       tags:
       - Publicaciones
       summary: Crear una publicación
-      description: Solo un ANFITRION. La publicación queda en BORRADOR con la política
-        FLEXIBLE.
+      description: "Solo un ANFITRION. La publicación queda en BORRADOR; si no se\
+        \ elige política de cancelación, se usa FLEXIBLE."
       operationId: crear_1
       requestBody:
         content:
@@ -525,8 +527,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/PublicacionResponse"
         "400":
-          description: "Datos inválidos (capacidad, precio, campos obligatorios) o\
-            \ servicio inexistente"
+          description: "Datos inválidos (capacidad, precio, campos obligatorios),\
+            \ servicio o política inexistente"
           content:
             '*/*':
               schema:
@@ -898,6 +900,30 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/politicas-cancelacion:
+    get:
+      tags:
+      - Políticas de cancelación
+      summary: Listar las políticas de cancelación disponibles
+      description: De la más flexible a la más estricta.
+      operationId: listar_2
+      responses:
+        "200":
+          description: Políticas disponibles
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PoliticaCancelacionResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/notificaciones:
     get:
       tags:
@@ -905,7 +931,7 @@ paths:
       summary: Listar mis notificaciones
       description: "De la más reciente a la más antigua, paginadas. Cada una dice\
         \ si está leída."
-      operationId: listar_2
+      operationId: listar_3
       parameters:
       - name: pagina
         in: query
@@ -1074,7 +1100,7 @@ paths:
       tags:
       - Disponibilidad
       summary: Ver el calendario de una publicación propia
-      operationId: listar_3
+      operationId: listar_4
       parameters:
       - name: idPublicacion
         in: path
@@ -1348,6 +1374,9 @@ components:
             type: string
             maxLength: 500
             minLength: 0
+        idPoliticaCancelacion:
+          type: integer
+          format: int32
       required:
       - capacidad
       - ciudad
@@ -1622,6 +1651,9 @@ components:
             type: string
             maxLength: 500
             minLength: 0
+        idPoliticaCancelacion:
+          type: integer
+          format: int32
       required:
       - capacidad
       - ciudad
@@ -1795,6 +1827,23 @@ components:
           type: array
           items:
             type: string
+    PoliticaCancelacionResponse:
+      type: object
+      properties:
+        idPolitica:
+          type: integer
+          format: int32
+        nombre:
+          type: string
+        descripcion:
+          type: string
+        diasAntesReembolsoTotal:
+          type: integer
+          format: int32
+        porcentajeDevolucionParcial:
+          type: number
+        porcentajeDevolucionTardia:
+          type: number
     PaginaResponseNotificacionResponse:
       type: object
       properties:
