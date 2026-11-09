@@ -10,6 +10,7 @@ import co.edu.unbosque.marketplace.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
 import co.edu.unbosque.marketplace.exception.NoEsPropietarioException;
+import co.edu.unbosque.marketplace.exception.PoliticaCancelacionNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.PublicacionBloqueadaException;
 import co.edu.unbosque.marketplace.exception.PublicacionIncompletaException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoActivaException;
@@ -37,6 +38,15 @@ import co.edu.unbosque.marketplace.repository.PublicacionRepository;
 import co.edu.unbosque.marketplace.repository.ReglaAlojamientoRepository;
 import co.edu.unbosque.marketplace.repository.ServicioRepository;
 import co.edu.unbosque.marketplace.repository.UsuarioRepository;
+import co.edu.unbosque.marketplace.repository.ReservaRepository;
+import co.edu.unbosque.marketplace.repository.NotificacionRepository;
+import co.edu.unbosque.marketplace.dto.BloqueoPublicacionRequest;
+import co.edu.unbosque.marketplace.dto.PaginaResponse;
+import co.edu.unbosque.marketplace.dto.PublicacionAdminResponse;
+import co.edu.unbosque.marketplace.exception.CambioEstadoPublicacionInvalidoException;
+import co.edu.unbosque.marketplace.model.Notificacion;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,6 +68,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -90,6 +103,10 @@ class PublicacionServiceTest {
     private ServicioAuditoria servicioAuditoria;
     @Mock
     private ResenaService resenaService;
+    @Mock
+    private ReservaRepository reservaRepository;
+    @Mock
+    private NotificacionRepository notificacionRepository;
 
     private PublicacionService publicacionService;
     private Usuario usuario;
@@ -98,7 +115,8 @@ class PublicacionServiceTest {
     void preparar() {
         publicacionService = new PublicacionService(usuarioRepository, anfitrionRepository, adminRepository,
                 alojamientoRepository, publicacionRepository, politicaCancelacionRepository, servicioRepository,
-                reglaAlojamientoRepository, imagenRepository, servicioAuditoria, resenaService);
+                reglaAlojamientoRepository, imagenRepository, servicioAuditoria, resenaService, reservaRepository,
+                notificacionRepository);
         usuario = new Usuario("Ana", "Gomez", "ana@ejemplo.com", "hash", "3000000000",
                 OffsetDateTime.now(), EstadoCuenta.ACTIVA);
         usuario.setIdUsuario(7);
@@ -108,14 +126,14 @@ class PublicacionServiceTest {
                                                  List<String> imagenes) {
         return new CrearPublicacionRequest("Apartamento frente al mar", "Vista al mar y wifi",
                 TipoAlojamiento.APARTAMENTO, (short) 4, "Cartagena", "Cra 1 # 2-3", "Bocagrande",
-                new BigDecimal("320000.00"), null, null, idsServicios, reglas, imagenes);
+                new BigDecimal("320000.00"), null, null, idsServicios, reglas, imagenes, null);
     }
 
     private EditarPublicacionRequest unaEdicion(List<Integer> idsServicios, List<String> reglas,
                                                 List<String> imagenes, Boolean reservaInmediata) {
         return new EditarPublicacionRequest("Casa renovada", "Descripcion actualizada", TipoAlojamiento.CASA,
                 (short) 6, "Medellin", "Cra 10 # 20-30", "El Poblado", new BigDecimal("450000.00"),
-                new BigDecimal("50000.00"), reservaInmediata, idsServicios, reglas, imagenes);
+                new BigDecimal("50000.00"), reservaInmediata, idsServicios, reglas, imagenes, null);
     }
 
     private PoliticaCancelacion flexible() {
@@ -593,5 +611,236 @@ class PublicacionServiceTest {
 
         assertThrows(PublicacionNoEncontradaException.class, () -> publicacionService.cambiarEstado(
                 "ana@ejemplo.com", 1, EstadoPublicacion.ACTIVA, "127.0.0.1"));
+    }
+
+    // ---- SCRUM-48: bloquear publicacion ----
+
+    private Usuario unAdministrador() {
+        Usuario admin = new Usuario("Carla", "Admin", "admin@ejemplo.com", "hash", "3000000000",
+                OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        admin.setIdUsuario(99);
+        return admin;
+    }
+
+    @Test
+    void bloqueoEscenarios1y3_bloqueaNotificaAlAnfitrionYAuditaConElMotivo() {
+        Usuario admin = unAdministrador();
+        when(usuarioRepository.findByEmail("admin@ejemplo.com")).thenReturn(Optional.of(admin));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(reservaRepository.countByPublicacion_IdPublicacionAndEstadoInAndFechaSalidaAfter(
+                eq(1), anyCollection(), any())).thenReturn(0L);
+
+        PublicacionAdminResponse respuesta = publicacionService.cambiarBloqueo("admin@ejemplo.com", 1,
+                new BloqueoPublicacionRequest(true, " Fotos engañosas "), "127.0.0.1");
+
+        assertEquals("BLOQUEADA", respuesta.estado());
+        assertEquals("mario@ejemplo.com", respuesta.correoAnfitrion());
+        verify(publicacionRepository).save(publicacion);
+        ArgumentCaptor<Notificacion> notificacion = ArgumentCaptor.forClass(Notificacion.class);
+        verify(notificacionRepository).save(notificacion.capture());
+        assertEquals(7, notificacion.getValue().getUsuario().getIdUsuario());
+        assertEquals("Tu publicación fue bloqueada", notificacion.getValue().getTitulo());
+        assertTrue(notificacion.getValue().getMensaje().contains("Motivo: Fotos engañosas"));
+        assertEquals("PUBLICACION", notificacion.getValue().getReferenciaTipo());
+        assertEquals(1, notificacion.getValue().getReferenciaId());
+        verify(servicioAuditoria).registrarAccionAdmin(admin, "publicacion", 1, "BLOQUEO_PUBLICACION",
+                new ServicioAuditoria.CambioEstado("ACTIVA", "BLOQUEADA"), "Fotos engañosas", "127.0.0.1");
+    }
+
+    @Test
+    void bloqueoEscenario2_lasReservasVigentesSeConservanYSeAvisanParaRevisionManual() {
+        when(usuarioRepository.findByEmail("admin@ejemplo.com")).thenReturn(Optional.of(unAdministrador()));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(reservaRepository.countByPublicacion_IdPublicacionAndEstadoInAndFechaSalidaAfter(
+                eq(1), anyCollection(), any())).thenReturn(2L);
+
+        PublicacionAdminResponse respuesta = publicacionService.cambiarBloqueo("admin@ejemplo.com", 1,
+                new BloqueoPublicacionRequest(true, "Fraude"), "127.0.0.1");
+
+        assertEquals(2, respuesta.reservasFuturas());
+        ArgumentCaptor<Notificacion> notificacion = ArgumentCaptor.forClass(Notificacion.class);
+        verify(notificacionRepository).save(notificacion.capture());
+        assertTrue(notificacion.getValue().getMensaje().contains("2 reservas vigentes se conservan"));
+        verify(reservaRepository, never()).save(any());
+        verify(reservaRepository, never()).delete(any());
+    }
+
+    @Test
+    void desbloquearLaDejaPausadaYAvisaAlAnfitrion() {
+        Usuario admin = unAdministrador();
+        when(usuarioRepository.findByEmail("admin@ejemplo.com")).thenReturn(Optional.of(admin));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        publicacion.setEstado(EstadoPublicacion.BLOQUEADA);
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+
+        PublicacionAdminResponse respuesta = publicacionService.cambiarBloqueo("admin@ejemplo.com", 1,
+                new BloqueoPublicacionRequest(false, "Corrigió las fotos"), "127.0.0.1");
+
+        assertEquals("PAUSADA", respuesta.estado());
+        ArgumentCaptor<Notificacion> notificacion = ArgumentCaptor.forClass(Notificacion.class);
+        verify(notificacionRepository).save(notificacion.capture());
+        assertEquals("Tu publicación fue desbloqueada", notificacion.getValue().getTitulo());
+        verify(servicioAuditoria).registrarAccionAdmin(admin, "publicacion", 1, "DESBLOQUEO_PUBLICACION",
+                new ServicioAuditoria.CambioEstado("BLOQUEADA", "PAUSADA"), "Corrigió las fotos", "127.0.0.1");
+    }
+
+    @Test
+    void bloquearUnaYaBloqueadaNoGuardaNiNotificaNiAudita() {
+        when(usuarioRepository.findByEmail("admin@ejemplo.com")).thenReturn(Optional.of(unAdministrador()));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        publicacion.setEstado(EstadoPublicacion.BLOQUEADA);
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        BloqueoPublicacionRequest solicitud = new BloqueoPublicacionRequest(true, "Otra vez");
+
+        assertThrows(CambioEstadoPublicacionInvalidoException.class, () -> publicacionService.cambiarBloqueo(
+                "admin@ejemplo.com", 1, solicitud, "127.0.0.1"));
+
+        verify(publicacionRepository, never()).save(any());
+        verifyNoInteractions(notificacionRepository, servicioAuditoria);
+    }
+
+    @Test
+    void bloquearUnaPublicacionQueNoExisteResponde404() {
+        when(usuarioRepository.findByEmail("admin@ejemplo.com")).thenReturn(Optional.of(unAdministrador()));
+        when(publicacionRepository.findById(5)).thenReturn(Optional.empty());
+        BloqueoPublicacionRequest solicitud = new BloqueoPublicacionRequest(true, "Fraude");
+
+        assertThrows(PublicacionNoEncontradaException.class, () -> publicacionService.cambiarBloqueo(
+                "admin@ejemplo.com", 5, solicitud, "127.0.0.1"));
+    }
+
+    @Test
+    void listarParaAdminSinEstadoBuscaSoloPorTitulo() {
+        when(publicacionRepository.findByTituloContainingIgnoreCase(eq("mar"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(unaPublicacion(1, 7, "Cartagena"))));
+
+        PaginaResponse<PublicacionAdminResponse> pagina =
+                publicacionService.listarParaAdmin(" mar ", null, 0, 20);
+
+        assertEquals(1, pagina.totalElementos());
+        assertEquals("Cartagena", pagina.contenido().getFirst().ciudad());
+        verify(publicacionRepository, never()).findByTituloContainingIgnoreCaseAndEstado(any(), any(), any());
+    }
+
+    @Test
+    void listarParaAdminConEstadoFiltraPorEl() {
+        when(publicacionRepository.findByTituloContainingIgnoreCaseAndEstado(
+                eq(""), eq(EstadoPublicacion.BLOQUEADA), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        PaginaResponse<PublicacionAdminResponse> pagina =
+                publicacionService.listarParaAdmin(null, EstadoPublicacion.BLOQUEADA, 0, 20);
+
+        assertEquals(0, pagina.totalElementos());
+    }
+
+    // ---- SCRUM-42: politica de cancelacion por publicacion ----
+
+    private PoliticaCancelacion estricta() {
+        PoliticaCancelacion politica = new PoliticaCancelacion("ESTRICTA", "Reembolso total hasta 14 dias antes",
+                (short) 14, new BigDecimal("50.00"), new BigDecimal("0.00"));
+        politica.setIdPolitica(3);
+        return politica;
+    }
+
+    private CrearPublicacionRequest unaSolicitudConPolitica(Integer idPolitica) {
+        return new CrearPublicacionRequest("Apartamento frente al mar", "Vista al mar y wifi",
+                TipoAlojamiento.APARTAMENTO, (short) 4, "Cartagena", "Cra 1 # 2-3", "Bocagrande",
+                new BigDecimal("320000.00"), null, null, null, null, null, idPolitica);
+    }
+
+    private EditarPublicacionRequest unaEdicionConPolitica(Integer idPolitica) {
+        return new EditarPublicacionRequest("Casa renovada", "Descripcion actualizada", TipoAlojamiento.CASA,
+                (short) 6, "Medellin", "Cra 10 # 20-30", "El Poblado", new BigDecimal("450000.00"),
+                null, null, null, null, null, idPolitica);
+    }
+
+    @Test
+    void politicaEscenario1_alCrearQuedaAsociadaLaPoliticaElegida() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        when(anfitrionRepository.findById(7)).thenReturn(Optional.of(new Anfitrion(usuario)));
+        when(politicaCancelacionRepository.findById(3)).thenReturn(Optional.of(estricta()));
+        prepararGuardado();
+
+        PublicacionResponse respuesta = publicacionService.crear("ana@ejemplo.com",
+                unaSolicitudConPolitica(3), "127.0.0.1");
+
+        assertEquals("ESTRICTA", respuesta.politicaCancelacion());
+        verify(politicaCancelacionRepository, never()).findByNombre(any());
+    }
+
+    @Test
+    void politicaAlCrearConUnaPoliticaInexistenteRechazaYNoGuardaNada() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        when(anfitrionRepository.findById(7)).thenReturn(Optional.of(new Anfitrion(usuario)));
+        when(politicaCancelacionRepository.findById(99)).thenReturn(Optional.empty());
+
+        assertThrows(PoliticaCancelacionNoEncontradaException.class, () -> publicacionService.crear(
+                "ana@ejemplo.com", unaSolicitudConPolitica(99), "127.0.0.1"));
+
+        verify(alojamientoRepository, never()).save(any());
+        verify(publicacionRepository, never()).save(any());
+    }
+
+    @Test
+    void politicaEscenario1_alEditarSeCambiaLaPolitica() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(adminRepository.existsById(7)).thenReturn(false);
+        when(politicaCancelacionRepository.findById(3)).thenReturn(Optional.of(estricta()));
+        prepararGuardadoDeEdicion();
+
+        PublicacionResponse respuesta = publicacionService.editar("ana@ejemplo.com", 1,
+                unaEdicionConPolitica(3), "127.0.0.1");
+
+        assertEquals("ESTRICTA", respuesta.politicaCancelacion());
+    }
+
+    @Test
+    void politicaAlEditarSinPoliticaSeConservaLaActual() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(adminRepository.existsById(7)).thenReturn(false);
+        prepararGuardadoDeEdicion();
+
+        PublicacionResponse respuesta = publicacionService.editar("ana@ejemplo.com", 1,
+                unaEdicionConPolitica(null), "127.0.0.1");
+
+        assertEquals("FLEXIBLE", respuesta.politicaCancelacion());
+        verify(politicaCancelacionRepository, never()).findById(any());
+    }
+
+    @Test
+    void politicaAlEditarConUnaPoliticaInexistenteNoGuarda() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(adminRepository.existsById(7)).thenReturn(false);
+        when(politicaCancelacionRepository.findById(99)).thenReturn(Optional.empty());
+
+        assertThrows(PoliticaCancelacionNoEncontradaException.class, () -> publicacionService.editar(
+                "ana@ejemplo.com", 1, unaEdicionConPolitica(99), "127.0.0.1"));
+
+        verify(publicacionRepository, never()).save(any());
+    }
+
+    @Test
+    void politicaEscenario3_sinPoliticaNoSePuedeActivar() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        publicacion.setEstado(EstadoPublicacion.BORRADOR);
+        publicacion.setPoliticaCancelacion(null);
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+
+        PublicacionIncompletaException error = assertThrows(PublicacionIncompletaException.class,
+                () -> publicacionService.cambiarEstado("ana@ejemplo.com", 1, EstadoPublicacion.ACTIVA, "127.0.0.1"));
+
+        assertEquals("No puedes activarla: elige una política de cancelación.", error.getMessage());
+        assertEquals(EstadoPublicacion.BORRADOR, publicacion.getEstado());
+        verify(publicacionRepository, never()).save(any());
     }
 }

@@ -167,6 +167,40 @@ class ManejadorGlobalExcepcionesTest {
     }
 
     @Test
+    void cambioEstadoCuentaInvalidoResponde409() {
+        ResponseEntity<ErrorResponse> respuesta =
+                manejador.manejar(new CambioEstadoCuentaInvalidoException("Esta cuenta ya está restringida."));
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals("Esta cuenta ya está restringida.", respuesta.getBody().mensaje());
+    }
+
+    @Test
+    void usuarioNoEncontradoResponde404() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new UsuarioNoEncontradoException());
+
+        assertEquals(HttpStatus.NOT_FOUND, respuesta.getStatusCode());
+        assertEquals("El usuario no existe.", respuesta.getBody().mensaje());
+    }
+
+    @Test
+    void cambioEstadoPublicacionInvalidoResponde409() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(
+                new CambioEstadoPublicacionInvalidoException("Esta publicación ya está bloqueada."));
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals("Esta publicación ya está bloqueada.", respuesta.getBody().mensaje());
+    }
+
+    @Test
+    void politicaCancelacionNoEncontradaResponde400() {
+        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new PoliticaCancelacionNoEncontradaException());
+
+        assertEquals(HttpStatus.BAD_REQUEST, respuesta.getStatusCode());
+        assertEquals("La política de cancelación seleccionada no existe.", respuesta.getBody().mensaje());
+    }
+
+    @Test
     void periodoNoDisponibleResponde409() {
         ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new PeriodoNoDisponibleException());
 

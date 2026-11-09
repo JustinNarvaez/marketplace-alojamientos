@@ -115,6 +115,26 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(CambioEstadoCuentaInvalidoException.class)
+    public ResponseEntity<ErrorResponse> manejar(CambioEstadoCuentaInvalidoException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(UsuarioNoEncontradoException.class)
+    public ResponseEntity<ErrorResponse> manejar(UsuarioNoEncontradoException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(CambioEstadoPublicacionInvalidoException.class)
+    public ResponseEntity<ErrorResponse> manejar(CambioEstadoPublicacionInvalidoException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(PoliticaCancelacionNoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> manejar(PoliticaCancelacionNoEncontradaException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(PublicacionIncompletaException.class)
     public ResponseEntity<ErrorResponse> manejar(PublicacionIncompletaException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));

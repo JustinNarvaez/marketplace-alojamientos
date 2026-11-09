@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.model;
 
+import co.edu.unbosque.marketplace.exception.CambioEstadoPublicacionInvalidoException;
 import co.edu.unbosque.marketplace.exception.PublicacionBloqueadaException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoActivaException;
 import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
@@ -86,6 +87,24 @@ public class Publicacion {
     public void pausar() {
         if (estado != EstadoPublicacion.ACTIVA) {
             throw new PublicacionNoActivaException();
+        }
+        estado = EstadoPublicacion.PAUSADA;
+    }
+
+    // SCRUM-48, escenario 1: solo un ADMINISTRADOR (lo valida SecurityConfig).
+    // Sale de cualquier estado: incluso un BORRADOR puede tener contenido enganoso.
+    public void bloquear() {
+        if (estado == EstadoPublicacion.BLOQUEADA) {
+            throw new CambioEstadoPublicacionInvalidoException("Esta publicación ya está bloqueada.");
+        }
+        estado = EstadoPublicacion.BLOQUEADA;
+    }
+
+    // SCRUM-48: al desbloquear queda PAUSADA, no ACTIVA: el anfitrion la
+    // revisa y decide cuando volver a publicarla.
+    public void desbloquear() {
+        if (estado != EstadoPublicacion.BLOQUEADA) {
+            throw new CambioEstadoPublicacionInvalidoException("Esta publicación no está bloqueada.");
         }
         estado = EstadoPublicacion.PAUSADA;
     }

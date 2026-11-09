@@ -65,5 +65,8 @@ public record EditarPublicacionRequest(
              @Size(max = 255, message = "Cada regla admite máximo 255 caracteres.") String> reglas,
 
         List<@NotBlank(message = "Una imagen no puede estar vacía.")
-             @Size(max = 500, message = "Cada referencia de imagen admite máximo 500 caracteres.") String> imagenes
+             @Size(max = 500, message = "Cada referencia de imagen admite máximo 500 caracteres.") String> imagenes,
+
+        // SCRUM-42: si llega nulo se conserva la politica actual.
+        Integer idPoliticaCancelacion
 ) {}

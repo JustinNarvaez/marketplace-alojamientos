@@ -42,7 +42,7 @@ class PublicacionControllerTest {
         PublicacionController controller = new PublicacionController(publicacionService);
         CrearPublicacionRequest solicitud = new CrearPublicacionRequest("Casa", "Casa amplia",
                 TipoAlojamiento.CASA, (short) 6, "Bogota", "Calle 1", null,
-                new BigDecimal("200000"), null, null, null, null, null);
+                new BigDecimal("200000"), null, null, null, null, null, null);
         PublicacionResponse esperada = new PublicacionResponse(10, 3, "Casa", "Casa amplia", "CASA",
                 (short) 6, "Bogota", "Calle 1", null, new BigDecimal("200000"), BigDecimal.ZERO, true,
                 "BORRADOR", "FLEXIBLE", List.of(), List.of(), List.of(), OffsetDateTime.now());
@@ -88,7 +88,7 @@ class PublicacionControllerTest {
         PublicacionController controller = new PublicacionController(publicacionService);
         EditarPublicacionRequest solicitud = new EditarPublicacionRequest("Casa renovada", "Descripcion actualizada",
                 TipoAlojamiento.CASA, (short) 6, "Medellin", "Cra 10 # 20-30", "El Poblado",
-                new BigDecimal("450000"), null, null, null, null, null);
+                new BigDecimal("450000"), null, null, null, null, null, null);
         PublicacionResponse esperada = new PublicacionResponse(1, 3, "Casa renovada", "Descripcion actualizada",
                 "CASA", (short) 6, "Medellin", "Cra 10 # 20-30", "El Poblado", new BigDecimal("450000"),
                 BigDecimal.ZERO, true, "ACTIVA", "FLEXIBLE", List.of(), List.of(), List.of(), OffsetDateTime.now());
