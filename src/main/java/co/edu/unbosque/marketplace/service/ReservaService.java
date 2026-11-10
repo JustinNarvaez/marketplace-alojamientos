@@ -6,6 +6,8 @@ import co.edu.unbosque.marketplace.dto.CrearReservaRequest;
 import co.edu.unbosque.marketplace.dto.ReservaResponse;
 import co.edu.unbosque.marketplace.dto.ReservaResumenResponse;
 import co.edu.unbosque.marketplace.dto.ServicioAdicionalResponse;
+import co.edu.unbosque.marketplace.exception.ClaveIdempotenciaInvalidaException;
+import co.edu.unbosque.marketplace.exception.ClaveIdempotenciaReutilizadaException;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.ReservaNoEncontradaException;
@@ -33,6 +35,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -46,6 +49,9 @@ import java.util.stream.Collectors;
  */
 @Service
 public class ReservaService {
+
+    // Largo de la columna reserva.clave_idempotencia (VARCHAR(80)).
+    private static final int LARGO_MAXIMO_CLAVE = 80;
 
     private final CotizacionService cotizacionService;
     private final DisponibilidadService disponibilidadService;
@@ -77,18 +83,21 @@ public class ReservaService {
     }
 
     @Transactional
-    public ReservaResponse crear(String correo, CrearReservaRequest request, String ipOrigen) {
+    public ReservaResponse crear(String correo, CrearReservaRequest request, String claveHeader,
+                                 String ipOrigen) {
+        String clave = claveDe(claveHeader, request.claveIdempotencia());
         Usuario usuario = usuarioRepository.findByEmail(correo)
                 .orElseThrow(CredencialesInvalidasException::new);
         // SecurityConfig ya exige el rol HUESPED; esto es la fila de la tabla huesped.
         Huesped huesped = huespedRepository.findById(usuario.getIdUsuario())
                 .orElseThrow(CredencialesInvalidasException::new);
 
-        Reserva existente = reservaRepository
-                .findByClaveIdempotenciaAndHuesped_IdUsuario(request.claveIdempotencia(), usuario.getIdUsuario())
-                .orElse(null);
+        // SCRUM-39, escenarios 1 y 3: con la clave tomada, un reintento (aunque
+        // llegue al mismo tiempo que el original) ve la reserva ya creada.
+        reservaRepository.bloquearClaveIdempotencia(clave);
+        Reserva existente = reservaRepository.findByClaveIdempotencia(clave).orElse(null);
         if (existente != null) {
-            return aResponse(existente, extrasDe(existente));
+            return repetir(existente, usuario, request);
         }
 
         // Revalida todo (fechas, publicacion activa, capacidad, disponibilidad)
@@ -105,7 +114,7 @@ public class ReservaService {
 
         Reserva reserva = new Reserva(huesped, publicacion.getAlojamiento(), publicacion,
                 request.fechaLlegada(), request.fechaSalida(), request.numeroHuespedes(),
-                EstadoReserva.PENDIENTE_APROBACION, OffsetDateTime.now(), request.claveIdempotencia(),
+                EstadoReserva.PENDIENTE_APROBACION, OffsetDateTime.now(), clave,
                 cotizacion.precioNoche(), cotizacion.noches().shortValue(), cotizacion.subtotalAlojamiento(),
                 cotizacion.tarifaLimpieza(), cotizacion.tarifaServicio(), cotizacion.descuento(),
                 cotizacion.total());
@@ -164,6 +173,50 @@ public class ReservaService {
                 reserva.getPublicacion().getTitulo(), reserva.getAlojamiento().getCiudad(),
                 reserva.getFechaLlegada(), reserva.getFechaSalida(), reserva.getNumeroHuespedes(),
                 reserva.getTotal(), reserva.getEstado().name(), huesped.getNombre() + " " + huesped.getApellido());
+    }
+
+    /**
+     * SCRUM-39. La clave llega en el header Idempotency-Key (como pide la
+     * historia) o, por compatibilidad con SCRUM-38, en el cuerpo. Si llegan
+     * las dos, deben ser la misma.
+     */
+    static String claveDe(String claveHeader, String claveCuerpo) {
+        boolean hayHeader = claveHeader != null && !claveHeader.isBlank();
+        boolean hayCuerpo = claveCuerpo != null && !claveCuerpo.isBlank();
+        if (!hayHeader && !hayCuerpo) {
+            throw new ClaveIdempotenciaInvalidaException(
+                    "Falta la clave de idempotencia: envíala en el header Idempotency-Key.");
+        }
+        if (hayHeader && hayCuerpo && !claveHeader.trim().equals(claveCuerpo.trim())) {
+            throw new ClaveIdempotenciaInvalidaException(
+                    "La clave del header Idempotency-Key no coincide con la del cuerpo.");
+        }
+        String clave = hayHeader ? claveHeader.trim() : claveCuerpo.trim();
+        if (clave.length() > LARGO_MAXIMO_CLAVE) {
+            throw new ClaveIdempotenciaInvalidaException("La clave de idempotencia admite máximo 80 caracteres.");
+        }
+        return clave;
+    }
+
+    /**
+     * SCRUM-39, escenario 1: la misma clave devuelve la reserva original, sin
+     * volver a cotizar, bloquear fechas, notificar ni auditar. Si la clave es
+     * de otro huesped o venia con otros datos, 409 (sin revelar esa reserva).
+     */
+    private ReservaResponse repetir(Reserva existente, Usuario usuario, CrearReservaRequest request) {
+        boolean esDelMismoHuesped = usuario.getIdUsuario()
+                .equals(existente.getHuesped().getUsuario().getIdUsuario());
+        List<ServicioAdicionalResponse> extras = extrasDe(existente);
+        Set<Integer> extrasPedidos = request.idsServiciosAdicionales() == null
+                ? Set.of() : Set.copyOf(request.idsServiciosAdicionales());
+        Set<Integer> extrasGuardados = extras.stream().map(ServicioAdicionalResponse::idServicioAdicional)
+                .collect(Collectors.toSet());
+        if (!esDelMismoHuesped || !extrasPedidos.equals(extrasGuardados)
+                || !existente.coincideCon(request.idPublicacion(), request.fechaLlegada(), request.fechaSalida(),
+                request.numeroHuespedes())) {
+            throw new ClaveIdempotenciaReutilizadaException();
+        }
+        return aResponse(existente, extras);
     }
 
     // SCRUM-37: cada extra se cobra una vez por estancia (cantidad = 1), al

@@ -6,6 +6,8 @@ import co.edu.unbosque.marketplace.dto.CrearReservaRequest;
 import co.edu.unbosque.marketplace.dto.ReservaResponse;
 import co.edu.unbosque.marketplace.dto.ReservaResumenResponse;
 import co.edu.unbosque.marketplace.dto.ServicioAdicionalResponse;
+import co.edu.unbosque.marketplace.exception.ClaveIdempotenciaInvalidaException;
+import co.edu.unbosque.marketplace.exception.ClaveIdempotenciaReutilizadaException;
 import co.edu.unbosque.marketplace.exception.PeriodoNoDisponibleException;
 import co.edu.unbosque.marketplace.exception.ReservaNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.ReservaRequiereAprobacionException;
@@ -44,6 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -124,7 +127,7 @@ class ReservaServiceTest {
         Usuario usuario = unUsuario();
         when(usuarioRepository.findByEmail(CORREO)).thenReturn(Optional.of(usuario));
         when(huespedRepository.findById(7)).thenReturn(Optional.of(new Huesped(usuario)));
-        when(reservaRepository.findByClaveIdempotenciaAndHuesped_IdUsuario(CLAVE, 7)).thenReturn(Optional.empty());
+        when(reservaRepository.findByClaveIdempotencia(CLAVE)).thenReturn(Optional.empty());
     }
 
     // El id lo asigna la base (IDENTITY): se simula aqui porque el repositorio esta mockeado.
@@ -154,7 +157,7 @@ class ReservaServiceTest {
         alGuardarAsignaId();
         alConfirmarDejaConfirmada();
 
-        ReservaResponse respuesta = reservaService.crear(CORREO, solicitud(null), "127.0.0.1");
+        ReservaResponse respuesta = reservaService.crear(CORREO, solicitud(null), null, "127.0.0.1");
 
         assertEquals(42, respuesta.idReserva());
         assertEquals("CONFIRMADA", respuesta.estado());
@@ -177,7 +180,7 @@ class ReservaServiceTest {
         alGuardarAsignaId();
         alConfirmarDejaConfirmada();
 
-        ReservaResponse respuesta = reservaService.crear(CORREO, solicitud(List.of(5)), "127.0.0.1");
+        ReservaResponse respuesta = reservaService.crear(CORREO, solicitud(List.of(5)), null, "127.0.0.1");
 
         assertEquals(1, respuesta.serviciosAdicionales().size());
         verify(detalleServicioReservaRepository).save(any());
@@ -193,7 +196,7 @@ class ReservaServiceTest {
                 .when(disponibilidadService).confirmarReservaYBloquear(any());
 
         assertThrows(PeriodoNoDisponibleException.class,
-                () -> reservaService.crear(CORREO, solicitud(null), "127.0.0.1"));
+                () -> reservaService.crear(CORREO, solicitud(null), null, "127.0.0.1"));
         verify(notificacionRepository, never()).save(any());
     }
 
@@ -204,7 +207,7 @@ class ReservaServiceTest {
         when(cotizacionService.cotizar(any())).thenReturn(unaCotizacion(List.of(), BigDecimal.ZERO));
 
         assertThrows(ReservaRequiereAprobacionException.class,
-                () -> reservaService.crear(CORREO, solicitud(null), "127.0.0.1"));
+                () -> reservaService.crear(CORREO, solicitud(null), null, "127.0.0.1"));
         verify(disponibilidadService, never()).confirmarReservaYBloquear(any());
     }
 
@@ -222,11 +225,11 @@ class ReservaServiceTest {
                 new BigDecimal("300000.00"), new BigDecimal("50000.00"), new BigDecimal("30000.00"), BigDecimal.ZERO,
                 new BigDecimal("380000.00"));
         existente.setIdReserva(42);
-        when(reservaRepository.findByClaveIdempotenciaAndHuesped_IdUsuario(CLAVE, 7))
+        when(reservaRepository.findByClaveIdempotencia(CLAVE))
                 .thenReturn(Optional.of(existente));
         when(detalleServicioReservaRepository.findByReserva_IdReserva(42)).thenReturn(List.of());
 
-        ReservaResponse respuesta = reservaService.crear(CORREO, solicitud(null), "127.0.0.1");
+        ReservaResponse respuesta = reservaService.crear(CORREO, solicitud(null), null, "127.0.0.1");
 
         assertEquals(42, respuesta.idReserva());
         verify(cotizacionService, never()).cotizar(any());
@@ -316,5 +319,87 @@ class ReservaServiceTest {
         when(reservaRepository.findById(42)).thenReturn(Optional.of(unaReservaDeAnaEnCasaDeLuis()));
 
         assertThrows(ReservaNoEncontradaException.class, () -> reservaService.consultar("otro@ejemplo.com", 42));
+    }
+
+    // ---------- SCRUM-39: idempotencia ----------
+
+    // Reserva de Ana (id 7) ya creada con CLAVE: publicacion 1, LLEGADA-SALIDA, 2 huespedes, sin extras.
+    private void yaExisteLaReservaDeAnaConLaClave(String clave) {
+        Usuario usuario = unUsuario();
+        // lenient: en la prueba "de otro huesped" la sesion es de otro usuario.
+        lenient().when(usuarioRepository.findByEmail(CORREO)).thenReturn(Optional.of(usuario));
+        lenient().when(huespedRepository.findById(7)).thenReturn(Optional.of(new Huesped(usuario)));
+        Alojamiento alojamiento = new Alojamiento(null, TipoAlojamiento.APARTAMENTO, (short) 4,
+                "Cartagena", "Cra 1 # 2-3", null, OffsetDateTime.now());
+        Reserva existente = new Reserva(new Huesped(usuario), alojamiento, unaPublicacion(true), LLEGADA, SALIDA,
+                (short) 2, EstadoReserva.CONFIRMADA, OffsetDateTime.now(), clave, new BigDecimal("100000.00"),
+                (short) 3, new BigDecimal("300000.00"), new BigDecimal("50000.00"), new BigDecimal("30000.00"),
+                BigDecimal.ZERO, new BigDecimal("380000.00"));
+        existente.setIdReserva(42);
+        when(reservaRepository.findByClaveIdempotencia(clave)).thenReturn(Optional.of(existente));
+        when(detalleServicioReservaRepository.findByReserva_IdReserva(42)).thenReturn(List.of());
+    }
+
+    @Test
+    void laClaveDelHeaderIdempotencyKeyTambienRepiteLaReserva() {
+        yaExisteLaReservaDeAnaConLaClave("clave-header");
+        CrearReservaRequest sinClaveEnElCuerpo = new CrearReservaRequest(1, LLEGADA, SALIDA, (short) 2, null, null);
+
+        ReservaResponse respuesta = reservaService.crear(CORREO, sinClaveEnElCuerpo, "clave-header", "127.0.0.1");
+
+        assertEquals(42, respuesta.idReserva());
+        verify(reservaRepository).bloquearClaveIdempotencia("clave-header");
+        verify(cotizacionService, never()).cotizar(any());
+    }
+
+    @Test
+    void reusarLaClaveConOtrasFechasRespondeConflicto() {
+        yaExisteLaReservaDeAnaConLaClave(CLAVE);
+        CrearReservaRequest otrasFechas = new CrearReservaRequest(1, LLEGADA.plusDays(1), SALIDA.plusDays(1),
+                (short) 2, null, CLAVE);
+
+        assertThrows(ClaveIdempotenciaReutilizadaException.class,
+                () -> reservaService.crear(CORREO, otrasFechas, null, "127.0.0.1"));
+        verify(reservaRepository, never()).save(any());
+    }
+
+    @Test
+    void reusarLaClaveConOtrosExtrasRespondeConflicto() {
+        yaExisteLaReservaDeAnaConLaClave(CLAVE);
+
+        assertThrows(ClaveIdempotenciaReutilizadaException.class,
+                () -> reservaService.crear(CORREO, solicitud(List.of(5)), null, "127.0.0.1"));
+    }
+
+    @Test
+    void laClaveDeOtroHuespedRespondeConflictoSinRevelarSuReserva() {
+        Usuario otro = new Usuario("Otro", "Huesped", "otro@ejemplo.com", "hash", null, OffsetDateTime.now(),
+                EstadoCuenta.ACTIVA);
+        otro.setIdUsuario(8);
+        yaExisteLaReservaDeAnaConLaClave(CLAVE);
+        when(usuarioRepository.findByEmail("otro@ejemplo.com")).thenReturn(Optional.of(otro));
+        when(huespedRepository.findById(8)).thenReturn(Optional.of(new Huesped(otro)));
+
+        assertThrows(ClaveIdempotenciaReutilizadaException.class,
+                () -> reservaService.crear("otro@ejemplo.com", solicitud(null), null, "127.0.0.1"));
+    }
+
+    @Test
+    void sinClaveOConClavesDistintasRespondeSolicitudInvalida() {
+        CrearReservaRequest sinClave = new CrearReservaRequest(1, LLEGADA, SALIDA, (short) 2, null, " ");
+
+        assertThrows(ClaveIdempotenciaInvalidaException.class,
+                () -> reservaService.crear(CORREO, sinClave, null, "127.0.0.1"));
+        assertThrows(ClaveIdempotenciaInvalidaException.class,
+                () -> reservaService.crear(CORREO, solicitud(null), "otra-clave", "127.0.0.1"));
+        assertThrows(ClaveIdempotenciaInvalidaException.class,
+                () -> reservaService.crear(CORREO, sinClave, "x".repeat(81), "127.0.0.1"));
+        verify(reservaRepository, never()).bloquearClaveIdempotencia(any());
+    }
+
+    @Test
+    void laMismaClaveEnElHeaderYEnElCuerpoSeAcepta() {
+        assertEquals(CLAVE, ReservaService.claveDe(" " + CLAVE + " ", CLAVE));
+        assertEquals(CLAVE, ReservaService.claveDe(null, CLAVE));
     }
 }

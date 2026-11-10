@@ -146,6 +146,16 @@ public class Reserva {
     }
 
     /**
+     * SCRUM-39: un reintento con la misma clave de idempotencia debe pedir la
+     * misma reserva. Si cambian la publicacion, las fechas o los huespedes, la
+     * clave se esta reutilizando para otra cosa.
+     */
+    public boolean coincideCon(Integer idPublicacion, LocalDate llegada, LocalDate salida, Short huespedes) {
+        return publicacion.getIdPublicacion().equals(idPublicacion) && fechaLlegada.equals(llegada)
+                && fechaSalida.equals(salida) && numeroHuespedes.equals(huespedes);
+    }
+
+    /**
      * SCRUM-33: solo una reserva pendiente se confirma (reserva inmediata,
      * aprobacion del anfitrion o pago). El bloqueo de las fechas lo hace
      * DisponibilidadService.confirmarReservaYBloquear, que llama a este metodo.

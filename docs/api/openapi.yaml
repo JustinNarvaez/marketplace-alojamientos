@@ -480,6 +480,14 @@ paths:
       description: "Revalida fechas, capacidad y disponibilidad, y confirma la reserva\
         \ de inmediato."
       operationId: crear_1
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        description: "SCRUM-39: clave única por intento de reserva (p. ej. un UUID).\
+          \ Reintentar con la misma clave devuelve la misma reserva sin crear otra."
+        required: false
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
@@ -513,8 +521,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: El periodo ya no está disponible o la publicación requiere
-            aprobación del anfitrión
+          description: "El periodo ya no está disponible, la publicación requiere\
+            \ aprobación del anfitrión o la clave de idempotencia ya se usó para otra\
+            \ reserva"
           content:
             '*/*':
               schema:
@@ -1510,6 +1519,43 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/listings/{id}/resenas:
+    get:
+      tags:
+      - Publicaciones
+      summary: Reseñas de un alojamiento
+      description: "Calificación promedio y reseñas visibles (las que ocultó un administrador\
+        \ no aparecen), la más reciente primero. Sin reseñas, promedio null y lista\
+        \ vacía."
+      operationId: consultarResenas
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: Promedio y listado de reseñas visibles
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResumenResenasResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La publicación no existe o ya no está disponible
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/listings/{id}/availability:
     get:
       tags:
@@ -2314,7 +2360,6 @@ components:
           maxLength: 80
           minLength: 0
       required:
-      - claveIdempotencia
       - fechaLlegada
       - fechaSalida
       - idPublicacion

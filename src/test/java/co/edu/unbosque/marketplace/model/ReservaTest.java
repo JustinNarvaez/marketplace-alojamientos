@@ -118,4 +118,23 @@ class ReservaTest {
         assertFalse(reserva.esVisiblePara(8));
         assertFalse(reserva.esVisiblePara(null));
     }
+
+    // SCRUM-39: un reintento con la misma clave debe pedir exactamente la misma reserva.
+    @Test
+    void coincideSoloConLaMismaPublicacionFechasYHuespedes() {
+        Publicacion publicacion = new Publicacion(null, null, "Casa", "Casa", new BigDecimal("100000"),
+                BigDecimal.ZERO, Boolean.TRUE, null, OffsetDateTime.now(), OffsetDateTime.now());
+        publicacion.setIdPublicacion(1);
+        LocalDate llegada = LocalDate.of(2026, 12, 1);
+        LocalDate salida = LocalDate.of(2026, 12, 5);
+        Reserva reserva = new Reserva(null, null, publicacion, llegada, salida, (short) 2, EstadoReserva.CONFIRMADA,
+                OffsetDateTime.now(), "clave-1", new BigDecimal("100000"), (short) 4, new BigDecimal("400000"),
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("400000"));
+
+        assertTrue(reserva.coincideCon(1, llegada, salida, (short) 2));
+        assertFalse(reserva.coincideCon(2, llegada, salida, (short) 2));
+        assertFalse(reserva.coincideCon(1, llegada.plusDays(1), salida, (short) 2));
+        assertFalse(reserva.coincideCon(1, llegada, salida.plusDays(1), (short) 2));
+        assertFalse(reserva.coincideCon(1, llegada, salida, (short) 3));
+    }
 }

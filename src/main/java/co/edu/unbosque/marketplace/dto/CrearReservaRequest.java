@@ -2,7 +2,6 @@ package co.edu.unbosque.marketplace.dto;
 
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
@@ -30,7 +29,7 @@ public record CrearReservaRequest(
 
         List<Integer> idsServiciosAdicionales,
 
-        @NotBlank(message = "La clave de idempotencia es obligatoria.")
+        // SCRUM-39: opcional si llega en el header Idempotency-Key (lo que usa el frontend).
         @Size(max = 80, message = "La clave de idempotencia admite máximo 80 caracteres.")
         String claveIdempotencia
 ) {}

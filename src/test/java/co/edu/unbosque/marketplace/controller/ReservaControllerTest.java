@@ -43,9 +43,9 @@ class ReservaControllerTest {
                 OffsetDateTime.now());
         when(principal.getName()).thenReturn("huesped@ejemplo.com");
         when(httpRequest.getRemoteAddr()).thenReturn("127.0.0.1");
-        when(reservaService.crear("huesped@ejemplo.com", solicitud, "127.0.0.1")).thenReturn(esperada);
+        when(reservaService.crear("huesped@ejemplo.com", solicitud, "clave-123", "127.0.0.1")).thenReturn(esperada);
 
-        ResponseEntity<ReservaResponse> respuesta = controller.crear(solicitud, principal, httpRequest);
+        ResponseEntity<ReservaResponse> respuesta = controller.crear(solicitud, "clave-123", principal, httpRequest);
 
         assertEquals(HttpStatus.CREATED, respuesta.getStatusCode());
         assertEquals(esperada, respuesta.getBody());
