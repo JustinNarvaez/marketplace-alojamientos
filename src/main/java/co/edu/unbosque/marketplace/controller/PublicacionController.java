@@ -10,6 +10,7 @@ import co.edu.unbosque.marketplace.dto.EstadoPublicacionResponse;
 import co.edu.unbosque.marketplace.dto.ModoReservaResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
+import co.edu.unbosque.marketplace.dto.ResumenResenasResponse;
 import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
 import co.edu.unbosque.marketplace.service.PublicacionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -130,6 +131,22 @@ public class PublicacionController {
     @GetMapping("/{id}")
     public DetalleAlojamientoResponse obtenerParaHuesped(@PathVariable Integer id) {
         return publicacionService.obtenerParaHuesped(id);
+    }
+
+    // SCRUM-47. Ruta nueva en espanol ("resenas"), bajo /api/listings como el detalle.
+    @Operation(summary = "Reseñas de un alojamiento",
+            description = "Calificación promedio y reseñas visibles (las que ocultó un administrador no aparecen), "
+                    + "la más reciente primero. Sin reseñas, promedio null y lista vacía.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Promedio y listado de reseñas visibles"),
+            @ApiResponse(responseCode = "401", description = "Falta el token o ya venció",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "La publicación no existe o ya no está disponible",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    })
+    @GetMapping("/{id}/resenas")
+    public ResumenResenasResponse consultarResenas(@PathVariable Integer id) {
+        return publicacionService.resenasParaHuesped(id);
     }
 
     // Solo el ANFITRION dueño; esta historia no menciona ADMINISTRADOR.

@@ -90,6 +90,10 @@ public class SecurityConfig {
                         // (que la reserva sea suya lo revisa CancelacionService).
                         .requestMatchers("/api/reservas/*/cancelacion", "/api/reservas/*/cancelacion/**")
                         .hasRole("HUESPED")
+                        // SCRUM-40: cada quien su listado. El detalle (GET /api/reservas/{id})
+                        // queda en authenticated(): huesped o anfitrion, lo revisa ReservaService.
+                        .requestMatchers(HttpMethod.GET, "/api/reservas/mias").hasRole("HUESPED")
+                        .requestMatchers(HttpMethod.GET, "/api/reservas/recibidas").hasRole("ANFITRION")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )

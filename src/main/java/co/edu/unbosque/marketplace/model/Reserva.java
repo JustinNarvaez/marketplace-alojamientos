@@ -137,6 +137,26 @@ public class Reserva {
     }
 
     /**
+     * SCRUM-40, escenarios 2 y 3: el detalle lo ve el huesped que reservo o
+     * el anfitrion dueno del alojamiento. Se compara por el usuario (y no por
+     * el id de huesped/anfitrion) porque ese id lo copia @MapsId al guardar.
+     */
+    public boolean esVisiblePara(Integer idUsuario) {
+        return idUsuario != null && (idUsuario.equals(huesped.getUsuario().getIdUsuario())
+                || idUsuario.equals(alojamiento.getAnfitrion().getUsuario().getIdUsuario()));
+    }
+
+    /**
+     * SCRUM-39: un reintento con la misma clave de idempotencia debe pedir la
+     * misma reserva. Si cambian la publicacion, las fechas o los huespedes, la
+     * clave se esta reutilizando para otra cosa.
+     */
+    public boolean coincideCon(Integer idPublicacion, LocalDate llegada, LocalDate salida, Short huespedes) {
+        return publicacion.getIdPublicacion().equals(idPublicacion) && fechaLlegada.equals(llegada)
+                && fechaSalida.equals(salida) && numeroHuespedes.equals(huespedes);
+    }
+
+    /**
      * SCRUM-33: solo una reserva pendiente se confirma (reserva inmediata,
      * aprobacion del anfitrion o pago). El bloqueo de las fechas lo hace
      * DisponibilidadService.confirmarReservaYBloquear, que llama a este metodo.

@@ -45,6 +45,16 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(ClaveIdempotenciaInvalidaException.class)
+    public ResponseEntity<ErrorResponse> manejar(ClaveIdempotenciaInvalidaException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(ClaveIdempotenciaReutilizadaException.class)
+    public ResponseEntity<ErrorResponse> manejar(ClaveIdempotenciaReutilizadaException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(CotizacionInvalidaException.class)
     public ResponseEntity<ErrorResponse> manejar(CotizacionInvalidaException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));

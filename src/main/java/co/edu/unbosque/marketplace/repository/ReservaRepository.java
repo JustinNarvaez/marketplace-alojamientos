@@ -3,6 +3,8 @@ package co.edu.unbosque.marketplace.repository;
 import co.edu.unbosque.marketplace.model.Reserva;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDate;
 import java.util.Collection;
@@ -11,12 +13,23 @@ import java.util.Optional;
 
 public interface ReservaRepository extends JpaRepository<Reserva, Integer> {
 
-    // SCRUM-38: replay de idempotencia. Si el huesped ya mando esta misma
-    // clave (doble clic, reintento de red), se devuelve la reserva que ya
-    // existe en vez de crear otra. Se restringe al propio huesped para no
-    // devolver una reserva ajena ante una colision de UUID (practicamente
-    // imposible, pero gratis de evitar).
-    Optional<Reserva> findByClaveIdempotenciaAndHuesped_IdUsuario(String claveIdempotencia, Integer idHuesped);
+    // SCRUM-38/39: replay de idempotencia. Si ya existe una reserva con esta
+    // clave (doble clic, reintento de red), ReservaService la devuelve en vez
+    // de crear otra; si es de otro huesped o con otros datos, responde 409.
+    // Se busca sin filtrar por huesped porque la columna es UNIQUE en toda la tabla.
+    Optional<Reserva> findByClaveIdempotencia(String claveIdempotencia);
+
+    // SCRUM-39, escenario 3: candado de PostgreSQL sobre la clave, hasta que
+    // termine la transaccion. Dos peticiones simultaneas con la misma clave
+    // quedan en fila: la segunda ya ve la reserva que creo la primera.
+    @Query(value = "SELECT 1 FROM pg_advisory_xact_lock(hashtext(:clave))", nativeQuery = true)
+    Integer bloquearClaveIdempotencia(@Param("clave") String clave);
+
+    // SCRUM-40, escenario 1: "Mis reservas", la proxima llegada primero.
+    List<Reserva> findByHuesped_IdUsuarioOrderByFechaLlegadaDesc(Integer idHuesped);
+
+    // SCRUM-40, escenario 3: solo las reservas de los alojamientos del anfitrion.
+    List<Reserva> findByAlojamiento_Anfitrion_IdUsuarioOrderByFechaLlegadaDesc(Integer idAnfitrion);
 
     // SCRUM-43: la reserva solo si es del huesped de la sesion (si no, 404).
     Optional<Reserva> findByIdReservaAndHuesped_IdUsuario(Integer idReserva, Integer idHuesped);

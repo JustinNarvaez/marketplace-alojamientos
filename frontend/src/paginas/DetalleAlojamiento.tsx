@@ -18,6 +18,7 @@ import { pedir, ErrorApi } from '../api/cliente'
 import Cotizador from '../componentes/Cotizador'
 import ConsultaDisponibilidad from '../componentes/ConsultaDisponibilidad'
 import FormularioResena from '../componentes/FormularioResena'
+import ResenasAlojamiento from '../componentes/ResenasAlojamiento'
 import { usarSesion } from '../sesion/SesionContext'
 
 // Coinciden con DetalleAlojamientoResponse del backend (los DTO son el contrato)
@@ -211,29 +212,7 @@ export default function DetalleAlojamiento() {
                                           alPublicar={() => setRecargas((valor) => valor + 1)} />
                     )}
 
-                    <Paper sx={{ p: 3 }}>
-                        <Typography variant="h6" gutterBottom>Reseñas</Typography>
-                        {resenas.totalResenas === 0 ? (
-                            <Typography color="text.secondary">
-                                Este alojamiento todavía no tiene reseñas.
-                            </Typography>
-                        ) : (
-                            <Stack spacing={2} divider={<Divider />}>
-                                {resenas.resenas.map((resena, indice) => (
-                                    <Box key={indice}>
-                                        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                                            <Typography sx={{ fontWeight: 600 }}>{resena.autor}</Typography>
-                                            <Rating value={resena.calificacion} readOnly size="small" />
-                                            <Typography variant="body2" color="text.secondary">
-                                                {new Date(resena.fecha).toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })}
-                                            </Typography>
-                                        </Stack>
-                                        {resena.comentario && <Typography sx={{ mt: 0.5 }}>{resena.comentario}</Typography>}
-                                    </Box>
-                                ))}
-                            </Stack>
-                        )}
-                    </Paper>
+                    <ResenasAlojamiento idPublicacion={publicacion.idPublicacion} recargas={recargas} />
                 </Stack>
 
                 <Stack spacing={2} sx={{ width: { xs: '100%', md: 380 }, flexShrink: 0, position: { md: 'sticky' }, top: { md: 16 } }}>

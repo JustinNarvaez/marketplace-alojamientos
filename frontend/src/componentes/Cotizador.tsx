@@ -70,6 +70,8 @@ export default function Cotizador({ idPublicacion }: { idPublicacion: number }) 
     const [reserva, setReserva] = useState<Reserva | null>(null)
     const [errorReserva, setErrorReserva] = useState<string | null>(null)
     const [confirmando, setConfirmando] = useState(false)
+    // SCRUM-39, escenario 3: si se cayo la red, se reintenta con la misma clave.
+    const [puedeReintentar, setPuedeReintentar] = useState(false)
 
     useEffect(() => {
         pedir<ServicioAdicional[]>(`/listings/${idPublicacion}/extras`)
@@ -103,6 +105,7 @@ export default function Cotizador({ idPublicacion }: { idPublicacion: number }) 
             setClaveIdempotencia(crypto.randomUUID())
             setReserva(null)
             setErrorReserva(null)
+            setPuedeReintentar(false)
         } catch (err) {
             // 409 = periodo no disponible (escenario 4): se muestra el mensaje y no hay total.
             setCotizacion(null)
@@ -117,21 +120,30 @@ export default function Cotizador({ idPublicacion }: { idPublicacion: number }) 
         setErrorReserva(null)
         setConfirmando(true)
         try {
+            // SCRUM-39: la clave va en el header Idempotency-Key. Reenviarla
+            // devuelve la misma reserva, nunca una segunda.
             const respuesta = await pedir<Reserva>('/reservas', {
                 method: 'POST',
+                headers: { 'Idempotency-Key': claveIdempotencia },
                 body: JSON.stringify({
                     idPublicacion,
                     fechaLlegada: llegada,
                     fechaSalida: salida,
                     numeroHuespedes: Number(huespedes),
                     idsServiciosAdicionales: seleccionados,
-                    claveIdempotencia,
                 }),
             })
             setReserva(respuesta)
+            setPuedeReintentar(false)
         } catch (err) {
-            // Motivo del rechazo (periodo ya no disponible, publicacion requiere aprobacion, etc.)
-            setErrorReserva(err instanceof ErrorApi ? err.message : 'Ocurrió un error. Intenta más tarde')
+            // Sin conexion (estado 0) o error del servidor: no sabemos si la
+            // reserva alcanzo a crearse, asi que se reintenta con la misma clave.
+            const sinRespuestaClara = !(err instanceof ErrorApi) || err.estado === 0 || err.estado >= 500
+            setPuedeReintentar(sinRespuestaClara)
+            setErrorReserva(sinRespuestaClara
+                ? 'No pudimos confirmar si tu reserva quedó registrada. Reintenta: no se creará una reserva duplicada.'
+                // Motivo del rechazo (periodo ya no disponible, publicacion requiere aprobacion, etc.)
+                : err.message)
         } finally {
             setConfirmando(false)
         }
@@ -225,7 +237,7 @@ export default function Cotizador({ idPublicacion }: { idPublicacion: number }) 
 
                     {errorReserva && <Alert severity="error">{errorReserva}</Alert>}
                     <Button variant="contained" color="secondary" disabled={confirmando} onClick={confirmarReserva}>
-                        {confirmando ? 'Confirmando…' : 'Confirmar reserva'}
+                        {confirmando ? 'Confirmando…' : puedeReintentar ? 'Reintentar' : 'Confirmar reserva'}
                     </Button>
                 </Stack>
             )}
@@ -236,10 +248,10 @@ export default function Cotizador({ idPublicacion }: { idPublicacion: number }) 
             {reserva && reserva.estado === 'CONFIRMADA' && (
                 <Alert severity="success" sx={{ mt: 3 }}
                        action={
-                           // SCRUM-43: mientras no exista "Mis reservas" (SCRUM-40), se cancela desde aqui.
+                           // SCRUM-40: desde el detalle se ve el desglose y se puede cancelar (SCRUM-43).
                            <Button color="inherit" size="small" component={RouterLink}
-                                   to={`/mis-reservas/${reserva.idReserva}/cancelar`}>
-                               Cancelar
+                                   to={`/mis-reservas/${reserva.idReserva}`}>
+                               Ver reserva
                            </Button>
                        }>
                     Reserva #{reserva.idReserva} confirmada. Total: {pesos.format(reserva.total)}.
