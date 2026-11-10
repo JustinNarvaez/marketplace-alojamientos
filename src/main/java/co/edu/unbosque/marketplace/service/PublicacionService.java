@@ -3,6 +3,7 @@ package co.edu.unbosque.marketplace.service;
 import co.edu.unbosque.marketplace.dto.BloqueoPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.DetalleAlojamientoResponse;
+import co.edu.unbosque.marketplace.dto.ResumenResenasResponse;
 import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.EstadoPublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PaginaResponse;
@@ -409,6 +410,21 @@ public class PublicacionService {
             reglaAlojamientoRepository.save(new ReglaAlojamiento(publicacion, reglas.get(i), (short) (i + 1)));
         }
         return reglas;
+    }
+
+    /**
+     * SCRUM-47: solo las resenas de una publicacion, con la misma regla que
+     * el detalle (SCRUM-35): si no esta publicada, no se muestran. El filtro
+     * de las ocultas (SCRUM-50) y el promedio los hace ResenaService.resumenDe.
+     */
+    @Transactional(readOnly = true)
+    public ResumenResenasResponse resenasParaHuesped(Integer idPublicacion) {
+        Publicacion publicacion = publicacionRepository.findById(idPublicacion)
+                .orElseThrow(PublicacionNoEncontradaException::new);
+        if (!publicacion.esVisibleParaHuespedes()) {
+            throw new PublicacionNoDisponibleException();
+        }
+        return resenaService.resumenDe(idPublicacion);
     }
 
     /**
