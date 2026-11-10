@@ -6,6 +6,7 @@ import co.edu.unbosque.marketplace.dto.DetalleAlojamientoResponse;
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.EstadoPublicacionResponse;
+import co.edu.unbosque.marketplace.dto.ModoReservaResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
@@ -611,6 +612,39 @@ class PublicacionServiceTest {
 
         assertThrows(PublicacionNoEncontradaException.class, () -> publicacionService.cambiarEstado(
                 "ana@ejemplo.com", 1, EstadoPublicacion.ACTIVA, "127.0.0.1"));
+    }
+
+    // ===== SCRUM-41: cambiarModoReserva =====
+
+    @Test
+    void cambiarModoReservaEscenario4_elDuenoLoCambiaYQuedaAuditado() {
+        when(usuarioRepository.findByEmail("ana@ejemplo.com")).thenReturn(Optional.of(usuario));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+        when(publicacionRepository.save(any(Publicacion.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ModoReservaResponse respuesta = publicacionService.cambiarModoReserva(
+                "ana@ejemplo.com", 1, false, "127.0.0.1");
+
+        assertEquals(false, respuesta.reservaInmediata());
+        verify(servicioAuditoria).registrarCambioEstado(usuario, TipoEventoAuditoria.PUBLICACION,
+                "publicacion", 1, "CAMBIAR_MODO_RESERVA",
+                new ServicioAuditoria.CambioEstado("true", "false"), "127.0.0.1");
+    }
+
+    @Test
+    void cambiarModoReservaSiNoEsElDuenoLanza403() {
+        Usuario otraAnfitriona = new Usuario("Laura", "Diaz", "laura@ejemplo.com", "hash", "3000000000",
+                OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        otraAnfitriona.setIdUsuario(55);
+        when(usuarioRepository.findByEmail("laura@ejemplo.com")).thenReturn(Optional.of(otraAnfitriona));
+        Publicacion publicacion = unaPublicacion(1, 7, "Cartagena");
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
+
+        assertThrows(NoEsPropietarioException.class, () -> publicacionService.cambiarModoReserva(
+                "laura@ejemplo.com", 1, false, "127.0.0.1"));
+
+        verify(publicacionRepository, never()).save(any());
     }
 
     // ---- SCRUM-48: bloquear publicacion ----

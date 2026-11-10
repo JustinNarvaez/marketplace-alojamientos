@@ -79,6 +79,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/listings/*/availability/*").hasRole("ANFITRION")
                         // SCRUM-38: solo un huesped puede confirmar su propia reserva.
                         .requestMatchers(HttpMethod.POST, "/api/reservas").hasRole("HUESPED")
+                        // SCRUM-41: el anfitrion configura el modo y decide sobre las solicitudes.
+                        .requestMatchers(HttpMethod.PATCH, "/api/listings/*/modo-reserva").hasRole("ANFITRION")
+                        .requestMatchers(HttpMethod.GET, "/api/reservas/pendientes").hasRole("ANFITRION")
+                        .requestMatchers(HttpMethod.PATCH, "/api/reservas/*/aprobacion").hasRole("ANFITRION")
                         // SCRUM-46: reseñar y ver las estancias por reseñar; solo el huesped.
                         .requestMatchers(HttpMethod.POST, "/api/reservas/*/resena").hasRole("HUESPED")
                         .requestMatchers(HttpMethod.GET, "/api/reservas/por-resenar").hasRole("HUESPED")

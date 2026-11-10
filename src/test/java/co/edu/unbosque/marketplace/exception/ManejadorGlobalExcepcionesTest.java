@@ -210,12 +210,12 @@ class ManejadorGlobalExcepcionesTest {
     }
 
     @Test
-    void reservaRequiereAprobacionResponde409() {
-        ResponseEntity<ErrorResponse> respuesta = manejador.manejar(new ReservaRequiereAprobacionException());
+    void reservaNoRechazableResponde409() {
+        ResponseEntity<ErrorResponse> respuesta =
+                manejador.manejar(new ReservaNoRechazableException(EstadoReserva.CONFIRMADA));
 
         assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
-        assertEquals("Esta publicación requiere aprobación del anfitrión antes de confirmar la reserva.",
-                respuesta.getBody().mensaje());
+        assertEquals("Esta reserva no se puede rechazar: está confirmada.", respuesta.getBody().mensaje());
     }
 
     @Test

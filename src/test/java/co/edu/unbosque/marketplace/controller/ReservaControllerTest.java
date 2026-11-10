@@ -1,7 +1,9 @@
 package co.edu.unbosque.marketplace.controller;
 
 import co.edu.unbosque.marketplace.dto.CrearReservaRequest;
+import co.edu.unbosque.marketplace.dto.DecidirReservaRequest;
 import co.edu.unbosque.marketplace.dto.ReservaResponse;
+import co.edu.unbosque.marketplace.dto.SolicitudReservaResponse;
 import co.edu.unbosque.marketplace.service.ReservaService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
@@ -48,5 +50,33 @@ class ReservaControllerTest {
 
         assertEquals(HttpStatus.CREATED, respuesta.getStatusCode());
         assertEquals(esperada, respuesta.getBody());
+    }
+
+    @Test
+    void listarPendientesDelegaConElIdDePublicacionYElAnfitrionDeLaSesion() {
+        ReservaController controller = new ReservaController(reservaService);
+        List<SolicitudReservaResponse> esperada = List.of(
+                new SolicitudReservaResponse(50, "Carlos Diaz", LocalDate.now().plusDays(10),
+                        LocalDate.now().plusDays(13), (short) 2, new BigDecimal("380000"), OffsetDateTime.now()));
+        when(principal.getName()).thenReturn("anfitrion@ejemplo.com");
+        when(reservaService.listarPendientes("anfitrion@ejemplo.com", 2)).thenReturn(esperada);
+
+        assertEquals(esperada, controller.listarPendientes(2, principal));
+    }
+
+    @Test
+    void decidirDelegaConElIdLaDecisionYLaIp() {
+        ReservaController controller = new ReservaController(reservaService);
+        DecidirReservaRequest solicitud = new DecidirReservaRequest("APROBAR");
+        LocalDate llegada = LocalDate.now().plusDays(10);
+        ReservaResponse esperada = new ReservaResponse(50, "CONFIRMADA", 2, llegada, llegada.plusDays(3),
+                (short) 2, 3, new BigDecimal("100000"), new BigDecimal("300000"), new BigDecimal("50000"),
+                new BigDecimal("30000"), List.of(), BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("380000"),
+                OffsetDateTime.now());
+        when(principal.getName()).thenReturn("anfitrion@ejemplo.com");
+        when(httpRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(reservaService.decidir("anfitrion@ejemplo.com", 50, "APROBAR", "127.0.0.1")).thenReturn(esperada);
+
+        assertEquals(esperada, controller.decidir(50, solicitud, principal, httpRequest));
     }
 }

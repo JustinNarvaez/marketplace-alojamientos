@@ -989,6 +989,60 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/reservas/{id}/aprobacion:
+    patch:
+      tags:
+      - Reservas
+      summary: Aprobar o rechazar una solicitud de reserva
+      description: Solo el ANFITRION dueño de la publicación. Aprobar confirma y bloquea
+        el periodo; rechazar lo deja disponible.
+      operationId: decidir
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecidirReservaRequest"
+        required: true
+      responses:
+        "200":
+          description: Reserva confirmada o rechazada
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReservaResponse"
+        "400":
+          description: Decisión inválida
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La reserva no existe o no es de una publicación propia
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "La reserva ya no está pendiente, o el periodo ya no está disponible"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/notificaciones/{idNotificacion}/leida:
     patch:
       tags:
@@ -1079,6 +1133,54 @@ paths:
         "409":
           description: "La publicación está BLOQUEADA, o se intenta pausar una que\
             \ no está ACTIVA"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/listings/{id}/modo-reserva:
+    patch:
+      tags:
+      - Publicaciones
+      summary: Configurar el modo de reserva
+      description: Solo el ANFITRION dueño. true confirma de inmediato; false exige
+        su aprobación.
+      operationId: cambiarModoReserva
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CambiarModoReservaRequest"
+        required: true
+      responses:
+        "200":
+          description: Modo de reserva actualizado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ModoReservaResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: No es el dueño de la publicación
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La publicación no existe
           content:
             '*/*':
               schema:
@@ -1326,6 +1428,49 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ReservaPorResenarResponse"
+      security:
+      - bearerAuth: []
+  /api/reservas/pendientes:
+    get:
+      tags:
+      - Reservas
+      summary: Listar las solicitudes pendientes de una publicación
+      description: Solo el ANFITRION dueño de la publicación.
+      operationId: listarPendientes
+      parameters:
+      - name: idPublicacion
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: Solicitudes PENDIENTE_APROBACION (vacío si no hay ninguna)
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SolicitudReservaResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: No es el dueño de la publicación
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La publicación no existe
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
   /api/politicas-cancelacion:
@@ -2564,6 +2709,15 @@ components:
       properties:
         estadoCuenta:
           type: string
+    DecidirReservaRequest:
+      type: object
+      properties:
+        decision:
+          type: string
+          minLength: 1
+          pattern: APROBAR|RECHAZAR
+      required:
+      - decision
     NotificacionResponse:
       type: object
       properties:
@@ -2600,6 +2754,18 @@ components:
       properties:
         estado:
           type: string
+    CambiarModoReservaRequest:
+      type: object
+      properties:
+        reservaInmediata:
+          type: boolean
+      required:
+      - reservaInmediata
+    ModoReservaResponse:
+      type: object
+      properties:
+        reservaInmediata:
+          type: boolean
     RestriccionUsuarioRequest:
       type: object
       properties:
@@ -2753,6 +2919,28 @@ components:
         fechaSalida:
           type: string
           format: date
+    SolicitudReservaResponse:
+      type: object
+      properties:
+        idReserva:
+          type: integer
+          format: int32
+        nombreHuesped:
+          type: string
+        fechaLlegada:
+          type: string
+          format: date
+        fechaSalida:
+          type: string
+          format: date
+        numeroHuespedes:
+          type: integer
+          format: int32
+        total:
+          type: number
+        fechaCreacion:
+          type: string
+          format: date-time
     PoliticaCancelacionResponse:
       type: object
       properties:

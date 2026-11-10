@@ -5,9 +5,11 @@ import co.edu.unbosque.marketplace.dto.CotizacionResponse;
 import co.edu.unbosque.marketplace.dto.CrearReservaRequest;
 import co.edu.unbosque.marketplace.dto.ReservaResponse;
 import co.edu.unbosque.marketplace.dto.ServicioAdicionalResponse;
+import co.edu.unbosque.marketplace.dto.SolicitudReservaResponse;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
+import co.edu.unbosque.marketplace.exception.NoEsPropietarioException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoEncontradaException;
-import co.edu.unbosque.marketplace.exception.ReservaRequiereAprobacionException;
+import co.edu.unbosque.marketplace.exception.ReservaNoEncontradaException;
 import co.edu.unbosque.marketplace.model.DetalleServicioReserva;
 import co.edu.unbosque.marketplace.model.Huesped;
 import co.edu.unbosque.marketplace.model.Notificacion;
@@ -16,6 +18,7 @@ import co.edu.unbosque.marketplace.model.Reserva;
 import co.edu.unbosque.marketplace.model.ServicioAdicional;
 import co.edu.unbosque.marketplace.model.Usuario;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
+import co.edu.unbosque.marketplace.model.enums.ResultadoAuditoria;
 import co.edu.unbosque.marketplace.model.enums.TipoEventoAuditoria;
 import co.edu.unbosque.marketplace.repository.DetalleServicioReservaRepository;
 import co.edu.unbosque.marketplace.repository.HuespedRepository;
@@ -97,9 +100,6 @@ public class ReservaService {
 
         Publicacion publicacion = publicacionRepository.findById(request.idPublicacion())
                 .orElseThrow(PublicacionNoEncontradaException::new);
-        if (!Boolean.TRUE.equals(publicacion.getReservaInmediata())) {
-            throw new ReservaRequiereAprobacionException();
-        }
 
         Reserva reserva = new Reserva(huesped, publicacion.getAlojamiento(), publicacion,
                 request.fechaLlegada(), request.fechaSalida(), request.numeroHuespedes(),
@@ -110,18 +110,102 @@ public class ReservaService {
         reservaRepository.save(reserva);
         guardarDetalleServicios(reserva, cotizacion);
 
-        disponibilidadService.confirmarReservaYBloquear(reserva);
-
-        notificacionRepository.save(new Notificacion(usuario, "RESERVA", "Reserva confirmada",
-                mensajeConfirmacion(publicacion.getTitulo(), reserva), false, OffsetDateTime.now(),
-                "RESERVA", reserva.getIdReserva()));
-
-        servicioAuditoria.registrarCambioEstado(usuario, TipoEventoAuditoria.RESERVA, "reserva",
-                reserva.getIdReserva(), "CREAR_RESERVA_INMEDIATA",
-                new ServicioAuditoria.CambioEstado(EstadoReserva.PENDIENTE_APROBACION.name(), reserva.getEstado().name()),
-                ipOrigen);
+        // SCRUM-41, escenarios 1 y 4: si la publicacion exige aprobacion, la
+        // reserva se queda PENDIENTE_APROBACION (no se confirma ni se
+        // bloquea nada todavia); si no, se confirma de inmediato como ya
+        // hacia esta historia (SCRUM-38).
+        if (Boolean.TRUE.equals(publicacion.getReservaInmediata())) {
+            disponibilidadService.confirmarReservaYBloquear(reserva);
+            notificacionRepository.save(new Notificacion(usuario, "RESERVA", "Reserva confirmada",
+                    mensajeConfirmacion(publicacion.getTitulo(), reserva), false, OffsetDateTime.now(),
+                    "RESERVA", reserva.getIdReserva()));
+            servicioAuditoria.registrarCambioEstado(usuario, TipoEventoAuditoria.RESERVA, "reserva",
+                    reserva.getIdReserva(), "CREAR_RESERVA_INMEDIATA",
+                    new ServicioAuditoria.CambioEstado(EstadoReserva.PENDIENTE_APROBACION.name(), reserva.getEstado().name()),
+                    ipOrigen);
+        } else {
+            notificarSolicitudPendiente(usuario, publicacion, reserva);
+            servicioAuditoria.registrarEnTransaccionActual(usuario, TipoEventoAuditoria.RESERVA, "reserva",
+                    reserva.getIdReserva(), "SOLICITAR_RESERVA", ResultadoAuditoria.EXITO, ipOrigen);
+        }
 
         return aResponse(reserva, cotizacion.serviciosAdicionales());
+    }
+
+    // SCRUM-41, escenario 1: mismo texto que ya trae scripts/datos-prueba.sql
+    // como ejemplo, asi que se reutiliza tal cual.
+    private void notificarSolicitudPendiente(Usuario huespedUsuario, Publicacion publicacion, Reserva reserva) {
+        OffsetDateTime ahora = OffsetDateTime.now();
+        String titulo = publicacion.getTitulo();
+        notificacionRepository.save(new Notificacion(huespedUsuario, "RESERVA", "Tu reserva está pendiente",
+                "El anfitrión de \"" + titulo + "\" debe aprobar tu solicitud.", false, ahora,
+                "RESERVA", reserva.getIdReserva()));
+        Usuario anfitrionUsuario = publicacion.getAlojamiento().getAnfitrion().getUsuario();
+        notificacionRepository.save(new Notificacion(anfitrionUsuario, "RESERVA", "Nueva solicitud de reserva",
+                huespedUsuario.getNombre() + " quiere reservar \"" + titulo + "\". Revisa la solicitud.", false,
+                ahora, "RESERVA", reserva.getIdReserva()));
+    }
+
+    /**
+     * SCRUM-41, escenarios 2 y 3: el anfitrion decide sobre una solicitud
+     * pendiente. Aprobar reutiliza exactamente el mismo camino que la
+     * reserva inmediata (confirmarReservaYBloquear); rechazar no libera
+     * ningun periodo porque una PENDIENTE_APROBACION nunca bloqueo nada.
+     */
+    @Transactional
+    public ReservaResponse decidir(String correo, Integer idReserva, String decision, String ipOrigen) {
+        Usuario usuario = usuarioRepository.findByEmail(correo)
+                .orElseThrow(CredencialesInvalidasException::new);
+        Reserva reserva = reservaRepository
+                .findByIdReservaAndAlojamiento_Anfitrion_IdUsuario(idReserva, usuario.getIdUsuario())
+                .orElseThrow(ReservaNoEncontradaException::new);
+
+        String estadoAnterior = reserva.getEstado().name();
+        String accion;
+        if ("APROBAR".equals(decision)) {
+            disponibilidadService.confirmarReservaYBloquear(reserva);
+            accion = "APROBAR_RESERVA";
+            notificacionRepository.save(new Notificacion(reserva.getHuesped().getUsuario(), "RESERVA",
+                    "Tu reserva fue aprobada",
+                    "El anfitrión aprobó tu solicitud en \"" + reserva.getPublicacion().getTitulo() + "\". ¡Buen viaje!",
+                    false, OffsetDateTime.now(), "RESERVA", reserva.getIdReserva()));
+        } else {
+            reserva.rechazar();
+            reservaRepository.save(reserva);
+            accion = "RECHAZAR_RESERVA";
+            notificacionRepository.save(new Notificacion(reserva.getHuesped().getUsuario(), "RESERVA",
+                    "Tu reserva fue rechazada",
+                    "El anfitrión rechazó tu solicitud en \"" + reserva.getPublicacion().getTitulo() + "\".",
+                    false, OffsetDateTime.now(), "RESERVA", reserva.getIdReserva()));
+        }
+
+        servicioAuditoria.registrarCambioEstado(usuario, TipoEventoAuditoria.RESERVA, "reserva",
+                reserva.getIdReserva(), accion,
+                new ServicioAuditoria.CambioEstado(estadoAnterior, reserva.getEstado().name()), ipOrigen);
+
+        return aResponse(reserva, extrasDe(reserva));
+    }
+
+    /** SCRUM-41: las solicitudes pendientes de una publicación propia, para que el anfitrión decida. */
+    @Transactional(readOnly = true)
+    public List<SolicitudReservaResponse> listarPendientes(String correo, Integer idPublicacion) {
+        Usuario usuario = usuarioRepository.findByEmail(correo)
+                .orElseThrow(CredencialesInvalidasException::new);
+        Publicacion publicacion = publicacionRepository.findById(idPublicacion)
+                .orElseThrow(PublicacionNoEncontradaException::new);
+        Integer idDueno = publicacion.getAlojamiento().getAnfitrion().getUsuario().getIdUsuario();
+        if (!idDueno.equals(usuario.getIdUsuario())) {
+            throw new NoEsPropietarioException();
+        }
+
+        return reservaRepository
+                .findByPublicacion_IdPublicacionAndEstado(idPublicacion, EstadoReserva.PENDIENTE_APROBACION)
+                .stream()
+                .map(reserva -> new SolicitudReservaResponse(reserva.getIdReserva(),
+                        reserva.getHuesped().getUsuario().getNombre() + " " + reserva.getHuesped().getUsuario().getApellido(),
+                        reserva.getFechaLlegada(), reserva.getFechaSalida(), reserva.getNumeroHuespedes(),
+                        reserva.getTotal(), reserva.getFechaCreacion()))
+                .toList();
     }
 
     // SCRUM-37: cada extra se cobra una vez por estancia (cantidad = 1), al

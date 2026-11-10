@@ -230,7 +230,10 @@ export default function Cotizador({ idPublicacion }: { idPublicacion: number }) 
                 </Stack>
             )}
 
-            {reserva && (
+            {/* SCRUM-41: si la publicacion exige aprobacion, la reserva queda
+                PENDIENTE_APROBACION en vez de CONFIRMADA; "Cancelar" solo
+                aplica a una ya confirmada (CancelacionService la rechaza si no). */}
+            {reserva && reserva.estado === 'CONFIRMADA' && (
                 <Alert severity="success" sx={{ mt: 3 }}
                        action={
                            // SCRUM-43: mientras no exista "Mis reservas" (SCRUM-40), se cancela desde aqui.
@@ -240,6 +243,11 @@ export default function Cotizador({ idPublicacion }: { idPublicacion: number }) 
                            </Button>
                        }>
                     Reserva #{reserva.idReserva} confirmada. Total: {pesos.format(reserva.total)}.
+                </Alert>
+            )}
+            {reserva && reserva.estado === 'PENDIENTE_APROBACION' && (
+                <Alert severity="info" sx={{ mt: 3 }}>
+                    Reserva #{reserva.idReserva} enviada. El anfitrión debe aprobarla. Total: {pesos.format(reserva.total)}.
                 </Alert>
             )}
         </Box>

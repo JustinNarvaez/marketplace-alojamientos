@@ -1,11 +1,13 @@
 package co.edu.unbosque.marketplace.controller;
 
 import co.edu.unbosque.marketplace.dto.CambiarEstadoPublicacionRequest;
+import co.edu.unbosque.marketplace.dto.CambiarModoReservaRequest;
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.DetalleAlojamientoResponse;
 import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.ErrorResponse;
 import co.edu.unbosque.marketplace.dto.EstadoPublicacionResponse;
+import co.edu.unbosque.marketplace.dto.ModoReservaResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResumenResponse;
 import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
@@ -152,5 +154,25 @@ public class PublicacionController {
                                                     Principal principal, HttpServletRequest httpRequest) {
         return publicacionService.cambiarEstado(principal.getName(), id,
                 EstadoPublicacion.valueOf(request.estado()), httpRequest.getRemoteAddr());
+    }
+
+    // Solo el ANFITRION dueño; SCRUM-41 no menciona ADMINISTRADOR.
+    @Operation(summary = "Configurar el modo de reserva",
+            description = "Solo el ANFITRION dueño. true confirma de inmediato; false exige su aprobación.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Modo de reserva actualizado"),
+            @ApiResponse(responseCode = "401", description = "Falta el token o ya venció",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "No es el dueño de la publicación",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "La publicación no existe",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    })
+    @PatchMapping("/{id}/modo-reserva")
+    public ModoReservaResponse cambiarModoReserva(@PathVariable Integer id,
+                                                  @Valid @RequestBody CambiarModoReservaRequest request,
+                                                  Principal principal, HttpServletRequest httpRequest) {
+        return publicacionService.cambiarModoReserva(principal.getName(), id, request.reservaInmediata(),
+                httpRequest.getRemoteAddr());
     }
 }
