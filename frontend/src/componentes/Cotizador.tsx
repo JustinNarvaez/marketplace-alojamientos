@@ -245,10 +245,10 @@ export default function Cotizador({ idPublicacion }: { idPublicacion: number }) 
             {reserva && (
                 <Alert severity="success" sx={{ mt: 3 }}
                        action={
-                           // SCRUM-43: mientras no exista "Mis reservas" (SCRUM-40), se cancela desde aqui.
+                           // SCRUM-40: desde el detalle se ve el desglose y se puede cancelar (SCRUM-43).
                            <Button color="inherit" size="small" component={RouterLink}
-                                   to={`/mis-reservas/${reserva.idReserva}/cancelar`}>
-                               Cancelar
+                                   to={`/mis-reservas/${reserva.idReserva}`}>
+                               Ver reserva
                            </Button>
                        }>
                     Reserva #{reserva.idReserva} confirmada. Total: {pesos.format(reserva.total)}.

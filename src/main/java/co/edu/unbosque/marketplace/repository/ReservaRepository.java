@@ -25,6 +25,12 @@ public interface ReservaRepository extends JpaRepository<Reserva, Integer> {
     @Query(value = "SELECT 1 FROM pg_advisory_xact_lock(hashtext(:clave))", nativeQuery = true)
     Integer bloquearClaveIdempotencia(@Param("clave") String clave);
 
+    // SCRUM-40, escenario 1: "Mis reservas", la proxima llegada primero.
+    List<Reserva> findByHuesped_IdUsuarioOrderByFechaLlegadaDesc(Integer idHuesped);
+
+    // SCRUM-40, escenario 3: solo las reservas de los alojamientos del anfitrion.
+    List<Reserva> findByAlojamiento_Anfitrion_IdUsuarioOrderByFechaLlegadaDesc(Integer idAnfitrion);
+
     // SCRUM-43: la reserva solo si es del huesped de la sesion (si no, 404).
     Optional<Reserva> findByIdReservaAndHuesped_IdUsuario(Integer idReserva, Integer idHuesped);
 

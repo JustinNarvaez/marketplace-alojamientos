@@ -4,11 +4,13 @@ import co.edu.unbosque.marketplace.dto.CotizacionRequest;
 import co.edu.unbosque.marketplace.dto.CotizacionResponse;
 import co.edu.unbosque.marketplace.dto.CrearReservaRequest;
 import co.edu.unbosque.marketplace.dto.ReservaResponse;
+import co.edu.unbosque.marketplace.dto.ReservaResumenResponse;
 import co.edu.unbosque.marketplace.dto.ServicioAdicionalResponse;
 import co.edu.unbosque.marketplace.exception.ClaveIdempotenciaInvalidaException;
 import co.edu.unbosque.marketplace.exception.ClaveIdempotenciaReutilizadaException;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
 import co.edu.unbosque.marketplace.exception.PublicacionNoEncontradaException;
+import co.edu.unbosque.marketplace.exception.ReservaNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.ReservaRequiereAprobacionException;
 import co.edu.unbosque.marketplace.model.DetalleServicioReserva;
 import co.edu.unbosque.marketplace.model.Huesped;
@@ -133,6 +135,46 @@ public class ReservaService {
         return aResponse(reserva, cotizacion.serviciosAdicionales());
     }
 
+    // SCRUM-40, escenarios 1 y 4: las reservas del huesped de la sesion
+    // (lista vacia si no tiene; el mensaje lo pone la pantalla).
+    @Transactional(readOnly = true)
+    public List<ReservaResumenResponse> listarMias(String correo) {
+        Usuario usuario = usuarioDeLaSesion(correo);
+        return reservaRepository.findByHuesped_IdUsuarioOrderByFechaLlegadaDesc(usuario.getIdUsuario()).stream()
+                .map(ReservaService::aResumen).toList();
+    }
+
+    // SCRUM-40, escenario 3: solo las reservas de los alojamientos del anfitrion de la sesion.
+    @Transactional(readOnly = true)
+    public List<ReservaResumenResponse> listarRecibidas(String correo) {
+        Usuario usuario = usuarioDeLaSesion(correo);
+        return reservaRepository.findByAlojamiento_Anfitrion_IdUsuarioOrderByFechaLlegadaDesc(usuario.getIdUsuario())
+                .stream().map(ReservaService::aResumen).toList();
+    }
+
+    // SCRUM-40, escenario 2: desglose y estado. A quien no es el huesped ni el
+    // anfitrion de esa reserva se le responde 404, para no revelar que existe.
+    @Transactional(readOnly = true)
+    public ReservaResponse consultar(String correo, Integer idReserva) {
+        Usuario usuario = usuarioDeLaSesion(correo);
+        Reserva reserva = reservaRepository.findById(idReserva)
+                .filter(encontrada -> encontrada.esVisiblePara(usuario.getIdUsuario()))
+                .orElseThrow(ReservaNoEncontradaException::new);
+        return aResponse(reserva, extrasDe(reserva));
+    }
+
+    private Usuario usuarioDeLaSesion(String correo) {
+        return usuarioRepository.findByEmail(correo).orElseThrow(CredencialesInvalidasException::new);
+    }
+
+    private static ReservaResumenResponse aResumen(Reserva reserva) {
+        Usuario huesped = reserva.getHuesped().getUsuario();
+        return new ReservaResumenResponse(reserva.getIdReserva(), reserva.getPublicacion().getIdPublicacion(),
+                reserva.getPublicacion().getTitulo(), reserva.getAlojamiento().getCiudad(),
+                reserva.getFechaLlegada(), reserva.getFechaSalida(), reserva.getNumeroHuespedes(),
+                reserva.getTotal(), reserva.getEstado().name(), huesped.getNombre() + " " + huesped.getApellido());
+    }
+
     /**
      * SCRUM-39. La clave llega en el header Idempotency-Key (como pide la
      * historia) o, por compatibilidad con SCRUM-38, en el cuerpo. Si llegan
@@ -216,7 +258,8 @@ public class ReservaService {
         BigDecimal totalExtras = extras.stream().map(ServicioAdicionalResponse::precio)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new ReservaResponse(reserva.getIdReserva(), reserva.getEstado().name(),
-                reserva.getPublicacion().getIdPublicacion(), reserva.getFechaLlegada(), reserva.getFechaSalida(),
+                reserva.getPublicacion().getIdPublicacion(), reserva.getPublicacion().getTitulo(),
+                reserva.getFechaLlegada(), reserva.getFechaSalida(),
                 reserva.getNumeroHuespedes(), (int) reserva.getNumeroNoches(), reserva.getPrecioNocheAplicado(),
                 reserva.getSubtotalAlojamiento(), reserva.getTarifaLimpiezaAplicada(),
                 reserva.getTarifaServicioAplicada(), extras, totalExtras, reserva.getDescuento(),
