@@ -479,6 +479,14 @@ paths:
       description: "Revalida fechas, capacidad y disponibilidad, y confirma la reserva\
         \ de inmediato."
       operationId: crear_1
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        description: "SCRUM-39: clave única por intento de reserva (p. ej. un UUID).\
+          \ Reintentar con la misma clave devuelve la misma reserva sin crear otra."
+        required: false
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
@@ -512,8 +520,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: El periodo ya no está disponible o la publicación requiere
-            aprobación del anfitrión
+          description: "El periodo ya no está disponible, la publicación requiere\
+            \ aprobación del anfitrión o la clave de idempotencia ya se usó para otra\
+            \ reserva"
           content:
             '*/*':
               schema:
@@ -2215,7 +2224,6 @@ components:
           maxLength: 80
           minLength: 0
       required:
-      - claveIdempotencia
       - fechaLlegada
       - fechaSalida
       - idPublicacion
