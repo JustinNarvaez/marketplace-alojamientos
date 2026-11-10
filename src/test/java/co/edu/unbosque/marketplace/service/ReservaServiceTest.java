@@ -6,11 +6,13 @@ import co.edu.unbosque.marketplace.dto.CrearReservaRequest;
 import co.edu.unbosque.marketplace.dto.ReservaResponse;
 import co.edu.unbosque.marketplace.dto.ReservaResumenResponse;
 import co.edu.unbosque.marketplace.dto.ServicioAdicionalResponse;
+import co.edu.unbosque.marketplace.dto.SolicitudReservaResponse;
 import co.edu.unbosque.marketplace.exception.ClaveIdempotenciaInvalidaException;
 import co.edu.unbosque.marketplace.exception.ClaveIdempotenciaReutilizadaException;
+import co.edu.unbosque.marketplace.exception.NoEsPropietarioException;
 import co.edu.unbosque.marketplace.exception.PeriodoNoDisponibleException;
 import co.edu.unbosque.marketplace.exception.ReservaNoEncontradaException;
-import co.edu.unbosque.marketplace.exception.ReservaRequiereAprobacionException;
+import co.edu.unbosque.marketplace.exception.ReservaNoRechazableException;
 import co.edu.unbosque.marketplace.model.Alojamiento;
 import co.edu.unbosque.marketplace.model.Anfitrion;
 import co.edu.unbosque.marketplace.model.Huesped;
@@ -48,6 +50,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -111,6 +114,34 @@ class ReservaServiceTest {
                 EstadoPublicacion.ACTIVA, OffsetDateTime.now(), OffsetDateTime.now());
         publicacion.setIdPublicacion(1);
         return publicacion;
+    }
+
+    // Con anfitrion real: lo necesitan decidir()/listarPendientes() para la pertenencia.
+    private Publicacion unaPublicacionDe(Integer idAnfitrion) {
+        Usuario usuarioAnfitrion = new Usuario("Mario", "Perez", "anfitrion@ejemplo.com", "hash",
+                "3000000001", OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        usuarioAnfitrion.setIdUsuario(idAnfitrion);
+        Anfitrion anfitrion = new Anfitrion(usuarioAnfitrion);
+        Alojamiento alojamiento = new Alojamiento(anfitrion, TipoAlojamiento.CASA, (short) 8,
+                "Guatapé", "Vereda El Roble", null, OffsetDateTime.now());
+        alojamiento.setIdAlojamiento(3);
+        Publicacion publicacion = new Publicacion(alojamiento, null, "Casa campestre", "Vista al lago",
+                new BigDecimal("100000.00"), new BigDecimal("50000.00"), false,
+                EstadoPublicacion.ACTIVA, OffsetDateTime.now(), OffsetDateTime.now());
+        publicacion.setIdPublicacion(2);
+        return publicacion;
+    }
+
+    private Reserva unaReservaPendiente(Publicacion publicacion) {
+        Usuario usuarioHuesped = new Usuario("Carlos", "Diaz", "huesped2@ejemplo.com", "hash",
+                "3000000002", OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        usuarioHuesped.setIdUsuario(8);
+        Reserva reserva = new Reserva(new Huesped(usuarioHuesped), publicacion.getAlojamiento(), publicacion,
+                LLEGADA, SALIDA, (short) 2, EstadoReserva.PENDIENTE_APROBACION, OffsetDateTime.now(), "clave-456",
+                new BigDecimal("100000.00"), (short) 3, new BigDecimal("300000.00"), new BigDecimal("50000.00"),
+                new BigDecimal("30000.00"), BigDecimal.ZERO, new BigDecimal("380000.00"));
+        reserva.setIdReserva(50);
+        return reserva;
     }
 
     private CotizacionResponse unaCotizacion(List<ServicioAdicionalResponse> extras, BigDecimal totalExtras) {
@@ -200,15 +231,116 @@ class ReservaServiceTest {
         verify(notificacionRepository, never()).save(any());
     }
 
+    // SCRUM-41, escenario 1: si la publicacion exige aprobacion, la reserva
+    // queda PENDIENTE_APROBACION en vez de confirmarse sola.
     @Test
-    void escenario3_unaPublicacionQueRequiereAprobacionSeRechaza() {
+    void escenario1Scrum41_unaPublicacionQueRequiereAprobacionQuedaPendiente() {
         sesionConHuesped();
-        when(publicacionRepository.findById(1)).thenReturn(Optional.of(unaPublicacion(false)));
+        Publicacion publicacion = unaPublicacionDe(9);
+        publicacion.setIdPublicacion(1);
+        when(publicacionRepository.findById(1)).thenReturn(Optional.of(publicacion));
         when(cotizacionService.cotizar(any())).thenReturn(unaCotizacion(List.of(), BigDecimal.ZERO));
+        alGuardarAsignaId();
 
-        assertThrows(ReservaRequiereAprobacionException.class,
-                () -> reservaService.crear(CORREO, solicitud(null), null, "127.0.0.1"));
+        ReservaResponse respuesta = reservaService.crear(CORREO, solicitud(null), null, "127.0.0.1");
+
+        assertEquals("PENDIENTE_APROBACION", respuesta.estado());
         verify(disponibilidadService, never()).confirmarReservaYBloquear(any());
+        verify(notificacionRepository, times(2)).save(any());
+    }
+
+    // ===== SCRUM-41: decidir() =====
+
+    @Test
+    void escenario2Scrum41_aprobarConfirmaLaReservaComoLaInmediata() {
+        Publicacion publicacion = unaPublicacionDe(9);
+        Reserva reserva = unaReservaPendiente(publicacion);
+        Usuario anfitrion = publicacion.getAlojamiento().getAnfitrion().getUsuario();
+        when(usuarioRepository.findByEmail("anfitrion@ejemplo.com")).thenReturn(Optional.of(anfitrion));
+        when(reservaRepository.findByIdReservaAndAlojamiento_Anfitrion_IdUsuario(50, 9))
+                .thenReturn(Optional.of(reserva));
+        alConfirmarDejaConfirmada();
+
+        ReservaResponse respuesta = reservaService.decidir("anfitrion@ejemplo.com", 50, "APROBAR", "127.0.0.1");
+
+        assertEquals("CONFIRMADA", respuesta.estado());
+        verify(disponibilidadService).confirmarReservaYBloquear(reserva);
+        verify(notificacionRepository).save(any());
+    }
+
+    @Test
+    void escenario3Scrum41_rechazarDejaLaReservaRechazadaSinTocarDisponibilidad() {
+        Publicacion publicacion = unaPublicacionDe(9);
+        Reserva reserva = unaReservaPendiente(publicacion);
+        Usuario anfitrion = publicacion.getAlojamiento().getAnfitrion().getUsuario();
+        when(usuarioRepository.findByEmail("anfitrion@ejemplo.com")).thenReturn(Optional.of(anfitrion));
+        when(reservaRepository.findByIdReservaAndAlojamiento_Anfitrion_IdUsuario(50, 9))
+                .thenReturn(Optional.of(reserva));
+
+        ReservaResponse respuesta = reservaService.decidir("anfitrion@ejemplo.com", 50, "RECHAZAR", "127.0.0.1");
+
+        assertEquals("RECHAZADA", respuesta.estado());
+        verify(disponibilidadService, never()).confirmarReservaYBloquear(any());
+        verify(notificacionRepository).save(any());
+    }
+
+    @Test
+    void rechazarUnaReservaQueYaNoEstaPendienteResponde409() {
+        Publicacion publicacion = unaPublicacionDe(9);
+        Reserva reserva = unaReservaPendiente(publicacion);
+        reserva.setEstado(EstadoReserva.RECHAZADA);
+        Usuario anfitrion = publicacion.getAlojamiento().getAnfitrion().getUsuario();
+        when(usuarioRepository.findByEmail("anfitrion@ejemplo.com")).thenReturn(Optional.of(anfitrion));
+        when(reservaRepository.findByIdReservaAndAlojamiento_Anfitrion_IdUsuario(50, 9))
+                .thenReturn(Optional.of(reserva));
+
+        assertThrows(ReservaNoRechazableException.class,
+                () -> reservaService.decidir("anfitrion@ejemplo.com", 50, "RECHAZAR", "127.0.0.1"));
+    }
+
+    @Test
+    void decidirSobreUnaReservaDeOtroAnfitrionResponde404() {
+        Usuario anfitrion = new Usuario("Otro", "Anfitrion", "otro@ejemplo.com", "hash", "3000000003",
+                OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        anfitrion.setIdUsuario(99);
+        when(usuarioRepository.findByEmail("otro@ejemplo.com")).thenReturn(Optional.of(anfitrion));
+        when(reservaRepository.findByIdReservaAndAlojamiento_Anfitrion_IdUsuario(50, 99))
+                .thenReturn(Optional.empty());
+
+        assertThrows(ReservaNoEncontradaException.class,
+                () -> reservaService.decidir("otro@ejemplo.com", 50, "APROBAR", "127.0.0.1"));
+    }
+
+    // ===== SCRUM-41: listarPendientes() =====
+
+    @Test
+    void elDuenoVeLasSolicitudesPendientesDeSuPublicacion() {
+        Publicacion publicacion = unaPublicacionDe(9);
+        Reserva reserva = unaReservaPendiente(publicacion);
+        Usuario anfitrion = publicacion.getAlojamiento().getAnfitrion().getUsuario();
+        when(usuarioRepository.findByEmail("anfitrion@ejemplo.com")).thenReturn(Optional.of(anfitrion));
+        when(publicacionRepository.findById(2)).thenReturn(Optional.of(publicacion));
+        when(reservaRepository.findByPublicacion_IdPublicacionAndEstado(2, EstadoReserva.PENDIENTE_APROBACION))
+                .thenReturn(List.of(reserva));
+
+        List<SolicitudReservaResponse> solicitudes = reservaService.listarPendientes("anfitrion@ejemplo.com", 2);
+
+        assertEquals(1, solicitudes.size());
+        assertEquals(50, solicitudes.get(0).idReserva());
+        assertEquals("Carlos Diaz", solicitudes.get(0).nombreHuesped());
+    }
+
+    @Test
+    void unAnfitrionQueNoEsDuenoNoPuedeListarLasSolicitudes() {
+        Publicacion publicacion = unaPublicacionDe(9);
+        Usuario otroAnfitrion = new Usuario("Otro", "Anfitrion", "otro@ejemplo.com", "hash", "3000000003",
+                OffsetDateTime.now(), EstadoCuenta.ACTIVA);
+        otroAnfitrion.setIdUsuario(99);
+        when(usuarioRepository.findByEmail("otro@ejemplo.com")).thenReturn(Optional.of(otroAnfitrion));
+        when(publicacionRepository.findById(2)).thenReturn(Optional.of(publicacion));
+
+        assertThrows(NoEsPropietarioException.class,
+                () -> reservaService.listarPendientes("otro@ejemplo.com", 2));
     }
 
     @Test

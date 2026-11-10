@@ -1,5 +1,19 @@
 import { useEffect, useState } from 'react'
-import { Alert, Box, Button, Chip, Divider, List, ListItem, ListItemText, Paper, Stack, Typography } from '@mui/material'
+import {
+    Alert,
+    Box,
+    Button,
+    Chip,
+    Divider,
+    FormControlLabel,
+    List,
+    ListItem,
+    ListItemText,
+    Paper,
+    Stack,
+    Switch,
+    Typography,
+} from '@mui/material'
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom'
 import { pedir, ErrorApi } from '../api/cliente'
 
@@ -21,6 +35,7 @@ interface PublicacionDetalle {
     ubicacion: string | null
     precioNoche: number
     tarifaLimpieza: number
+    reservaInmediata: boolean
     estado: string
     politicaCancelacion: string
     servicios: Servicio[]
@@ -37,6 +52,8 @@ export default function DetallePublicacion() {
     const [error, setError] = useState<string | null>(null)
     const [errorEstado, setErrorEstado] = useState<string | null>(null)
     const [cambiandoEstado, setCambiandoEstado] = useState(false)
+    const [errorModoReserva, setErrorModoReserva] = useState<string | null>(null)
+    const [cambiandoModoReserva, setCambiandoModoReserva] = useState(false)
 
     useEffect(() => {
         pedir<PublicacionDetalle>(`/listings/mine/${id}`)
@@ -64,6 +81,24 @@ export default function DetallePublicacion() {
             setErrorEstado(err instanceof ErrorApi ? err.message : 'No pudimos cambiar el estado.')
         } finally {
             setCambiandoEstado(false)
+        }
+    }
+
+    // SCRUM-41, escenario 4: alternar entre confirmar de inmediato o exigir
+    // la aprobacion del anfitrion para cada solicitud nueva.
+    const cambiarModoReserva = async (reservaInmediata: boolean) => {
+        setErrorModoReserva(null)
+        setCambiandoModoReserva(true)
+        try {
+            const respuesta = await pedir<{ reservaInmediata: boolean }>(`/listings/${id}/modo-reserva`, {
+                method: 'PATCH',
+                body: JSON.stringify({ reservaInmediata }),
+            })
+            setPublicacion((actual) => (actual ? { ...actual, reservaInmediata: respuesta.reservaInmediata } : actual))
+        } catch (err) {
+            setErrorModoReserva(err instanceof ErrorApi ? err.message : 'No pudimos cambiar el modo de reserva.')
+        } finally {
+            setCambiandoModoReserva(false)
         }
     }
 
@@ -95,6 +130,20 @@ export default function DetallePublicacion() {
                 </Stack>
             </Stack>
             {errorEstado && <Alert severity="error" sx={{ mb: 2 }}>{errorEstado}</Alert>}
+
+            <FormControlLabel
+                sx={{ mb: 1 }}
+                control={
+                    <Switch
+                        checked={publicacion.reservaInmediata}
+                        disabled={cambiandoModoReserva}
+                        onChange={(e) => void cambiarModoReserva(e.target.checked)}
+                    />
+                }
+                label={publicacion.reservaInmediata ? 'Reserva inmediata' : 'Requiere tu aprobación'}
+            />
+            {errorModoReserva && <Alert severity="error" sx={{ mb: 2 }}>{errorModoReserva}</Alert>}
+
             <Typography color="text.secondary" sx={{ mb: 2 }}>
                 {publicacion.ciudad} · {publicacion.direccion}
                 {publicacion.ubicacion && ` · ${publicacion.ubicacion}`}
@@ -108,6 +157,10 @@ export default function DetallePublicacion() {
                 <Button variant="outlined" size="small" component={RouterLink}
                         to={`/mis-publicaciones/${publicacion.idPublicacion}/extras`}>
                     Servicios adicionales
+                </Button>
+                <Button variant="outlined" size="small" component={RouterLink}
+                        to={`/mis-publicaciones/${publicacion.idPublicacion}/solicitudes`}>
+                    Solicitudes
                 </Button>
                 {publicacion.estado === 'ACTIVA' && (
                     <Button variant="outlined" size="small" component={RouterLink}

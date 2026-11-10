@@ -5,7 +5,9 @@ import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.DetalleAlojamientoResponse;
 import co.edu.unbosque.marketplace.dto.ResumenResenasResponse;
 import co.edu.unbosque.marketplace.dto.EditarPublicacionRequest;
+import co.edu.unbosque.marketplace.dto.CambiarModoReservaRequest;
 import co.edu.unbosque.marketplace.dto.EstadoPublicacionResponse;
+import co.edu.unbosque.marketplace.dto.ModoReservaResponse;
 import co.edu.unbosque.marketplace.dto.PaginaResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionAdminResponse;
 import co.edu.unbosque.marketplace.dto.PublicacionResponse;
@@ -303,6 +305,36 @@ public class PublicacionService {
                 new ServicioAuditoria.CambioEstado(estadoAnterior, publicacion.getEstado().name()), ipOrigen);
 
         return new EstadoPublicacionResponse(publicacion.getEstado().name());
+    }
+
+    /**
+     * SCRUM-41, escenario 4. Solo el ANFITRION dueno. Es un ajuste de
+     * configuracion, no un cambio de estado: no protege ningun invariante
+     * (se puede alternar en cualquier estado), asi que no hace falta un
+     * metodo propio en la entidad, y tampoco notifica a nadie.
+     */
+    @Transactional
+    public ModoReservaResponse cambiarModoReserva(String correo, Integer idPublicacion,
+                                                   Boolean reservaInmediata, String ipOrigen) {
+        Usuario usuario = usuarioRepository.findByEmail(correo)
+                .orElseThrow(CredencialesInvalidasException::new);
+        Publicacion publicacion = publicacionRepository.findById(idPublicacion)
+                .orElseThrow(PublicacionNoEncontradaException::new);
+
+        Integer idDueno = publicacion.getAlojamiento().getAnfitrion().getUsuario().getIdUsuario();
+        if (!idDueno.equals(usuario.getIdUsuario())) {
+            throw new NoEsPropietarioException();
+        }
+
+        String anterior = publicacion.getReservaInmediata().toString();
+        publicacion.setReservaInmediata(reservaInmediata);
+        publicacionRepository.save(publicacion);
+
+        servicioAuditoria.registrarCambioEstado(usuario, TipoEventoAuditoria.PUBLICACION, "publicacion",
+                idPublicacion, "CAMBIAR_MODO_RESERVA",
+                new ServicioAuditoria.CambioEstado(anterior, reservaInmediata.toString()), ipOrigen);
+
+        return new ModoReservaResponse(publicacion.getReservaInmediata());
     }
 
     /**

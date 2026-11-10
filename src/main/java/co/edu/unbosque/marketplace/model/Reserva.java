@@ -2,6 +2,7 @@ package co.edu.unbosque.marketplace.model;
 
 import co.edu.unbosque.marketplace.exception.ReservaNoCancelableException;
 import co.edu.unbosque.marketplace.exception.ReservaNoConfirmableException;
+import co.edu.unbosque.marketplace.exception.ReservaNoRechazableException;
 import co.edu.unbosque.marketplace.exception.ReservaNoResenableException;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
 import jakarta.persistence.*;
@@ -170,6 +171,23 @@ public class Reserva {
     public void validarQueSePuedeConfirmar() {
         if (estado != EstadoReserva.PENDIENTE_APROBACION) {
             throw new ReservaNoConfirmableException(estado);
+        }
+    }
+
+    /**
+     * SCRUM-41, escenario 3: el anfitrion rechaza una solicitud pendiente.
+     * No hay periodo que liberar: una PENDIENTE_APROBACION nunca tuvo fila
+     * en disponibilidad (esa se crea recien al confirmar, SCRUM-33), asi
+     * que el periodo queda libre solo con el cambio de estado.
+     */
+    public void rechazar() {
+        validarQueSePuedeRechazar();
+        estado = EstadoReserva.RECHAZADA;
+    }
+
+    public void validarQueSePuedeRechazar() {
+        if (estado != EstadoReserva.PENDIENTE_APROBACION) {
+            throw new ReservaNoRechazableException(estado);
         }
     }
 

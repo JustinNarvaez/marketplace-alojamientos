@@ -175,8 +175,8 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
     }
 
-    @ExceptionHandler(ReservaRequiereAprobacionException.class)
-    public ResponseEntity<ErrorResponse> manejar(ReservaRequiereAprobacionException ex) {
+    @ExceptionHandler(ReservaNoRechazableException.class)
+    public ResponseEntity<ErrorResponse> manejar(ReservaNoRechazableException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
     }
 

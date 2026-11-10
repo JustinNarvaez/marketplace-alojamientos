@@ -34,6 +34,13 @@ public interface ReservaRepository extends JpaRepository<Reserva, Integer> {
     // SCRUM-43: la reserva solo si es del huesped de la sesion (si no, 404).
     Optional<Reserva> findByIdReservaAndHuesped_IdUsuario(Integer idReserva, Integer idHuesped);
 
+    // SCRUM-41: la reserva solo si es de una publicacion del anfitrion de la
+    // sesion (si no, 404), para aprobar o rechazar una solicitud.
+    Optional<Reserva> findByIdReservaAndAlojamiento_Anfitrion_IdUsuario(Integer idReserva, Integer idAnfitrion);
+
+    // SCRUM-41: las solicitudes pendientes de una publicacion, para que el anfitrion decida.
+    List<Reserva> findByPublicacion_IdPublicacionAndEstado(Integer idPublicacion, EstadoReserva estado);
+
     // SCRUM-46: las estancias del huesped en esa publicacion que ya salieron.
     List<Reserva> findByHuesped_IdUsuarioAndPublicacion_IdPublicacionAndEstadoInAndFechaSalidaLessThanEqualOrderByFechaSalidaDesc(
             Integer idHuesped, Integer idPublicacion, Collection<EstadoReserva> estados, LocalDate hoy);

@@ -1,6 +1,8 @@
 package co.edu.unbosque.marketplace.controller;
 
 import co.edu.unbosque.marketplace.dto.CambiarEstadoPublicacionRequest;
+import co.edu.unbosque.marketplace.dto.CambiarModoReservaRequest;
+import co.edu.unbosque.marketplace.dto.ModoReservaResponse;
 import co.edu.unbosque.marketplace.dto.CrearPublicacionRequest;
 import co.edu.unbosque.marketplace.dto.DetalleAlojamientoResponse;
 import co.edu.unbosque.marketplace.dto.ResumenResenasResponse;
@@ -132,6 +134,21 @@ class PublicacionControllerTest {
                 .thenReturn(esperada);
 
         EstadoPublicacionResponse respuesta = controller.cambiarEstado(1, solicitud, principal, httpRequest);
+
+        assertEquals(esperada, respuesta);
+    }
+
+    @Test
+    void cambiarModoReservaDelegaConElIdElCorreoYLaIp() {
+        PublicacionController controller = new PublicacionController(publicacionService);
+        CambiarModoReservaRequest solicitud = new CambiarModoReservaRequest(false);
+        ModoReservaResponse esperada = new ModoReservaResponse(false);
+        when(principal.getName()).thenReturn("mario@ejemplo.com");
+        when(httpRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(publicacionService.cambiarModoReserva("mario@ejemplo.com", 1, false, "127.0.0.1"))
+                .thenReturn(esperada);
+
+        ModoReservaResponse respuesta = controller.cambiarModoReserva(1, solicitud, principal, httpRequest);
 
         assertEquals(esperada, respuesta);
     }
