@@ -74,4 +74,7 @@ public interface ReservaRepository extends JpaRepository<Reserva, Integer> {
     // SCRUM-48, escenario 2: reservas que siguen vigentes al bloquear.
     long countByPublicacion_IdPublicacionAndEstadoInAndFechaSalidaAfter(
             Integer idPublicacion, Collection<EstadoReserva> estados, LocalDate fecha);
+
+    // SCRUM-52: reservas por estado para el dashboard del administrador.
+    long countByEstado(EstadoReserva estado);
 }

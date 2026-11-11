@@ -27,4 +27,7 @@ public interface PublicacionRepository extends JpaRepository<Publicacion, Intege
 
     Page<Publicacion> findByTituloContainingIgnoreCaseAndEstado(String titulo, EstadoPublicacion estado,
                                                                Pageable pageable);
+
+    // SCRUM-52: publicaciones activas para el dashboard del administrador.
+    long countByEstado(EstadoPublicacion estado);
 }
