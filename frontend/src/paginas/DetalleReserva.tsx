@@ -12,6 +12,19 @@ interface ServicioAdicional {
     precio: number
 }
 
+// Coincide con PagoResponse del backend (SCRUM-56)
+interface EstadoPago {
+    tipo: string
+    estado: string
+}
+
+const ETIQUETAS_PAGO: Record<string, string> = {
+    CARGO_PENDIENTE: 'Pago en proceso',
+    CARGO_EXITOSO: 'Pago aprobado',
+    CARGO_FALLIDO: 'Pago rechazado',
+    REEMBOLSO_EXITOSO: 'Reembolsado',
+}
+
 // Coincide con ReservaResponse del backend (SCRUM-38 + tituloPublicacion de SCRUM-40)
 interface Reserva {
     idReserva: number
@@ -54,6 +67,7 @@ export default function DetalleReserva({ vista }: { vista: VistaReservas }) {
     const { idReserva } = useParams()
     const [reserva, setReserva] = useState<Reserva | null>(null)
     const [error, setError] = useState<string | null>(null)
+    const [pago, setPago] = useState<EstadoPago | null>(null)
 
     useEffect(() => {
         pedir<Reserva>(`/reservas/${idReserva}`)
@@ -61,6 +75,15 @@ export default function DetalleReserva({ vista }: { vista: VistaReservas }) {
             .catch((err) => {
                 setError(err instanceof ErrorApi ? err.message : 'No pudimos cargar la reserva.')
             })
+    }, [idReserva])
+
+    // SCRUM-56, escenario 3: no todas las reservas tienen un pago registrado
+    // (p. ej. una reserva inmediata nunca pasa por Stripe), asi que un 404 es
+    // normal aqui y no se muestra como error.
+    useEffect(() => {
+        pedir<EstadoPago>(`/payments/reserva/${idReserva}`)
+            .then(setPago)
+            .catch(() => setPago(null))
     }, [idReserva])
 
     const volver = vista === 'huesped' ? '/mis-reservas' : '/reservas-recibidas'
@@ -95,6 +118,11 @@ export default function DetalleReserva({ vista }: { vista: VistaReservas }) {
                 <Typography variant="body2" color="text.secondary">
                     Reservada el {fechaHora.format(new Date(reserva.fechaCreacion))}
                 </Typography>
+                {pago && (
+                    <Typography variant="body2" color="text.secondary">
+                        {ETIQUETAS_PAGO[`${pago.tipo}_${pago.estado}`] ?? `${pago.tipo} ${pago.estado}`}
+                    </Typography>
+                )}
 
                 <Divider />
                 <Fila concepto={`${pesos.format(reserva.precioNoche)} x ${reserva.noches} noche(s)`}

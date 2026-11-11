@@ -24,8 +24,6 @@ tags:
   description: Políticas que el anfitrión asocia a su publicación (SCRUM-42).
 - name: Cotizaciones
   description: Cotización de una estancia con desglose de tarifas (SCRUM-36).
-- name: Pagos
-  description: Pago simulado de una reserva con Stripe en modo pruebas (SCRUM-55).
 - name: Administración de reseñas
   description: Moderación de reseñas por el administrador (SCRUM-50).
 - name: Auditoría
@@ -42,6 +40,9 @@ tags:
   description: Búsqueda pública de alojamientos con filtros (SCRUM-34).
 - name: Disponibilidad
   description: Calendario de disponibilidad del anfitrión (SCRUM-31).
+- name: Pagos
+  description: Pago simulado de una reserva con Stripe en modo pruebas (SCRUM-55)
+    y trazabilidad de las transacciones (SCRUM-56).
 - name: Administración de usuarios
   description: Moderación de cuentas por el administrador (SCRUM-49).
 - name: Cancelaciones
@@ -1685,6 +1686,42 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/payments/reserva/{idReserva}:
+    get:
+      tags:
+      - Pagos
+      summary: Estado del pago de una reserva
+      description: "El cargo o reembolso más reciente de la reserva. Para el huésped\
+        \ que reservó, el anfitrión del alojamiento, o un administrador."
+      operationId: consultarEstado
+      parameters:
+      - name: idReserva
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: Estado del último pago registrado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PagoResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "La reserva no existe, no es tuya, o no tiene ningún pago registrado"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/notificaciones:
     get:
       tags:
@@ -3267,6 +3304,26 @@ components:
           type: number
         porcentajeDevolucionTardia:
           type: number
+    PagoResponse:
+      type: object
+      properties:
+        idPago:
+          type: integer
+          format: int32
+        idReserva:
+          type: integer
+          format: int32
+        tipo:
+          type: string
+        monto:
+          type: number
+        moneda:
+          type: string
+        estado:
+          type: string
+        fecha:
+          type: string
+          format: date-time
     PaginaResponseNotificacionResponse:
       type: object
       properties:

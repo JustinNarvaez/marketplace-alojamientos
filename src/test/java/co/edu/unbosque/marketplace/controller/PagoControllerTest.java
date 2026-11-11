@@ -2,6 +2,7 @@ package co.edu.unbosque.marketplace.controller;
 
 import co.edu.unbosque.marketplace.dto.CrearIntentoPagoRequest;
 import co.edu.unbosque.marketplace.dto.IntentoPagoResponse;
+import co.edu.unbosque.marketplace.dto.PagoResponse;
 import co.edu.unbosque.marketplace.service.PagoService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.security.Principal;
+import java.time.OffsetDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.verify;
@@ -45,5 +47,16 @@ class PagoControllerTest {
 
         assertEquals(HttpStatus.OK, respuesta.getStatusCode());
         verify(pagoService).procesarEvento("{\"id\":\"evt_1\"}", "t=1,v1=firma");
+    }
+
+    @Test
+    void consultarEstadoDelegaConElCorreoDeLaSesion() {
+        PagoController controller = new PagoController(pagoService);
+        PagoResponse esperada = new PagoResponse(1, 10, "CARGO", new BigDecimal("400000.00"), "COP", "EXITOSO",
+                OffsetDateTime.now());
+        when(principal.getName()).thenReturn("huesped@ejemplo.com");
+        when(pagoService.consultarEstado("huesped@ejemplo.com", 10)).thenReturn(esperada);
+
+        assertEquals(esperada, controller.consultarEstado(10, principal));
     }
 }
