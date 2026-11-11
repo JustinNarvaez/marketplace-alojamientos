@@ -4,6 +4,7 @@ public enum TipoEventoAuditoria {
     AUTENTICACION,
     PUBLICACION,
     RESERVA,
+    PAGO,
     CANCELACION,
     RESENA,
     EXPORTACION,

@@ -94,6 +94,10 @@ public class SecurityConfig {
                         // queda en authenticated(): huesped o anfitrion, lo revisa ReservaService.
                         .requestMatchers(HttpMethod.GET, "/api/reservas/mias").hasRole("HUESPED")
                         .requestMatchers(HttpMethod.GET, "/api/reservas/recibidas").hasRole("ANFITRION")
+                        // SCRUM-55: solo el huesped inicia el pago de su reserva; el webhook
+                        // lo llama Stripe directo, sin JWT (su propia firma lo autentica).
+                        .requestMatchers(HttpMethod.POST, "/api/payments/intent").hasRole("HUESPED")
+                        .requestMatchers(HttpMethod.POST, "/api/payments/webhook").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )

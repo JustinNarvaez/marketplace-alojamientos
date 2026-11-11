@@ -200,6 +200,17 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(WebhookStripeInvalidoException.class)
+    public ResponseEntity<ErrorResponse> manejar(WebhookStripeInvalidoException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(ServicioPagoNoDisponibleException.class)
+    public ResponseEntity<ErrorResponse> manejar(ServicioPagoNoDisponibleException ex) {
+        LOGGER.warn("Stripe no disponible: {}", ex.getCause() == null ? ex.getMessage() : ex.getCause().getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> manejar(MethodArgumentNotValidException ex) {
         String mensaje = ex.getBindingResult().getFieldErrors().stream()
