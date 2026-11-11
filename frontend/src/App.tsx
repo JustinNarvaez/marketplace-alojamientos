@@ -39,11 +39,13 @@ export default function App() {
                 <Route path="olvide-contrasena" element={<OlvideContrasena />} />
                 <Route path="restablecer-contrasena" element={<RestablecerContrasena />} />
                 <Route path="no-autorizado" element={<NoAutorizado />} />
+                {/* SCRUM-68: se ve y se cotiza sin sesion, igual que la busqueda;
+                    solo reservar (dentro de DetalleAlojamiento) exige iniciar sesion. */}
+                <Route path="alojamientos/:idPublicacion" element={<DetalleAlojamiento />} />
 
                 <Route element={<RutaProtegida />}>
                     <Route path="mi-cuenta" element={<MiCuenta />} />
                     <Route path="notificaciones" element={<Notificaciones />} />
-                    <Route path="alojamientos/:idPublicacion" element={<DetalleAlojamiento />} />
                 </Route>
 
                 <Route element={<RutaProtegida roles={['HUESPED']} />}>

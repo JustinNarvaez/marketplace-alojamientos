@@ -71,9 +71,16 @@ public class SecurityConfig {
                         // pertenencia y el estado BLOQUEADA se resuelven en el servicio).
                         .requestMatchers(HttpMethod.PUT, "/api/listings/*").hasAnyRole("ANFITRION", "ADMINISTRADOR")
                         .requestMatchers("/api/admin/**").hasRole("ADMINISTRADOR")
-                        // SCRUM-30: solo el panel de gestion del anfitrion. GET /api/listings/{id}
-                        // (sin /mine) es el detalle publico que consume el huesped (SCRUM-35).
+                        // SCRUM-30: solo el panel de gestion del anfitrion.
                         .requestMatchers(HttpMethod.GET, "/api/listings/mine/**").hasRole("ANFITRION")
+                        // SCRUM-68: se navega y se cotiza sin sesion, igual que se busca
+                        // (SCRUM-34); ninguno de estos metodos recibe el usuario autenticado.
+                        // Solo confirmar la reserva (POST /api/reservas) exige iniciar sesion.
+                        .requestMatchers(HttpMethod.GET, "/api/listings/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/listings/*/resenas").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/listings/*/availability").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/listings/*/extras").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/quotes").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/listings/*/availability").hasRole("ANFITRION")
                         .requestMatchers(HttpMethod.PUT, "/api/listings/*/availability/*").hasRole("ANFITRION")
                         .requestMatchers(HttpMethod.DELETE, "/api/listings/*/availability/*").hasRole("ANFITRION")
