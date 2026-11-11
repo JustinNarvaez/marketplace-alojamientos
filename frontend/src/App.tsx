@@ -8,7 +8,6 @@ import OlvideContrasena from './paginas/OlvideContrasena'
 import RestablecerContrasena from './paginas/RestablecerContrasena'
 import NoAutorizado from './paginas/NoAutorizado'
 import NoEncontrado from './paginas/NoEncontrado'
-import PaginaPendiente from './paginas/PaginaPendiente'
 import CancelarReserva from './paginas/CancelarReserva'
 import MisReservas from './paginas/MisReservas'
 import ReservasRecibidas from './paginas/ReservasRecibidas'
@@ -27,6 +26,7 @@ import MisPublicaciones from './paginas/MisPublicaciones'
 import DetallePublicacion from './paginas/DetallePublicacion'
 import DisponibilidadPublicacion from './paginas/DisponibilidadPublicacion'
 import SolicitudesReserva from './paginas/SolicitudesReserva'
+import Dashboard from './paginas/Dashboard'
 
 export default function App() {
     return (
@@ -64,7 +64,7 @@ export default function App() {
                     <Route path="mis-publicaciones/:id" element={<DetallePublicacion />} />
                 </Route>
                 <Route element={<RutaProtegida roles={['ADMINISTRADOR']} />}>
-                    <Route path="administracion" element={<PaginaPendiente titulo="Administración" />} />
+                    <Route path="administracion" element={<Dashboard />} />
                     <Route path="administracion/usuarios" element={<AdminUsuarios />} />
                     <Route path="administracion/publicaciones" element={<AdminPublicaciones />} />
                     <Route path="administracion/resenas" element={<AdminResenas />} />

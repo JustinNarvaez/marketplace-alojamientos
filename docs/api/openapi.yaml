@@ -44,6 +44,8 @@ tags:
   description: Moderación de cuentas por el administrador (SCRUM-49).
 - name: Cancelaciones
   description: Cancelar una reserva con devolución simulada (SCRUM-43).
+- name: Dashboard
+  description: Indicadores clave para el administrador (SCRUM-52).
 - name: Notificaciones
   description: Centro de notificaciones del usuario autenticado (SCRUM-45).
 paths:
@@ -2140,6 +2142,36 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/admin/dashboard:
+    get:
+      tags:
+      - Dashboard
+      summary: Ver los indicadores clave
+      description: "Solo ADMINISTRADOR. Total de usuarios, publicaciones activas,\
+        \ reservas por estado, ingresos estimados y ciudades con mayor demanda. Se\
+        \ recalcula en cada consulta."
+      operationId: obtener
+      responses:
+        "200":
+          description: Indicadores vigentes
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DashboardResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: El usuario autenticado no es ADMINISTRADOR
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
   /api/admin/audit-events:
     get:
       tags:
@@ -3292,6 +3324,34 @@ components:
         totalPaginas:
           type: integer
           format: int32
+    CiudadDemandaResponse:
+      type: object
+      properties:
+        ciudad:
+          type: string
+        reservas:
+          type: integer
+          format: int64
+    DashboardResponse:
+      type: object
+      properties:
+        totalUsuarios:
+          type: integer
+          format: int64
+        publicacionesActivas:
+          type: integer
+          format: int64
+        reservasPorEstado:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+        ingresosEstimados:
+          type: number
+        ciudadesConMayorDemanda:
+          type: array
+          items:
+            $ref: "#/components/schemas/CiudadDemandaResponse"
     EventoAuditoriaResponse:
       type: object
       properties:
