@@ -8,13 +8,17 @@ import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
 import co.edu.unbosque.marketplace.exception.ReservaNoEncontradaException;
 import co.edu.unbosque.marketplace.model.Cancelacion;
 import co.edu.unbosque.marketplace.model.Notificacion;
+import co.edu.unbosque.marketplace.model.Pago;
 import co.edu.unbosque.marketplace.model.PoliticaCancelacion;
 import co.edu.unbosque.marketplace.model.Reserva;
 import co.edu.unbosque.marketplace.model.Usuario;
+import co.edu.unbosque.marketplace.model.enums.EstadoPago;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
 import co.edu.unbosque.marketplace.model.enums.TipoEventoAuditoria;
+import co.edu.unbosque.marketplace.model.enums.TipoPago;
 import co.edu.unbosque.marketplace.repository.CancelacionRepository;
 import co.edu.unbosque.marketplace.repository.NotificacionRepository;
+import co.edu.unbosque.marketplace.repository.PagoRepository;
 import co.edu.unbosque.marketplace.repository.ReservaRepository;
 import co.edu.unbosque.marketplace.repository.UsuarioRepository;
 import org.springframework.stereotype.Service;
@@ -23,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 /**
  * SCRUM-43: el huesped cancela su reserva y ve la devolucion simulada (no
@@ -32,22 +37,27 @@ import java.time.OffsetDateTime;
 @Service
 public class CancelacionService {
 
+    private static final String MONEDA = "COP";
+
     private final CancelacionRepository cancelacionRepository;
     private final ReservaRepository reservaRepository;
     private final UsuarioRepository usuarioRepository;
     private final NotificacionRepository notificacionRepository;
     private final DisponibilidadService disponibilidadService;
     private final ServicioAuditoria servicioAuditoria;
+    private final PagoRepository pagoRepository;
 
     public CancelacionService(CancelacionRepository cancelacionRepository, ReservaRepository reservaRepository,
                               UsuarioRepository usuarioRepository, NotificacionRepository notificacionRepository,
-                              DisponibilidadService disponibilidadService, ServicioAuditoria servicioAuditoria) {
+                              DisponibilidadService disponibilidadService, ServicioAuditoria servicioAuditoria,
+                              PagoRepository pagoRepository) {
         this.cancelacionRepository = cancelacionRepository;
         this.reservaRepository = reservaRepository;
         this.usuarioRepository = usuarioRepository;
         this.notificacionRepository = notificacionRepository;
         this.disponibilidadService = disponibilidadService;
         this.servicioAuditoria = servicioAuditoria;
+        this.pagoRepository = pagoRepository;
     }
 
     /** Lo que se devolveria si cancela hoy, sin cancelar nada. */
@@ -86,6 +96,7 @@ public class CancelacionService {
 
         Cancelacion cancelacion = cancelacionRepository.save(new Cancelacion(reserva, usuario,
                 OffsetDateTime.now(), request.motivo().trim(), devolucion, EstadoReserva.CANCELADA.name()));
+        registrarReembolso(reserva, devolucion);
 
         notificar(reserva, usuario, devolucion);
         servicioAuditoria.registrarCambioEstado(usuario, TipoEventoAuditoria.CANCELACION, "reserva",
@@ -101,6 +112,20 @@ public class CancelacionService {
         return cancelacionRepository.findByReserva_IdReserva(reserva.getIdReserva())
                 .map(CancelacionService::aResponse)
                 .orElseThrow(CancelacionNoEncontradaException::new);
+    }
+
+    /**
+     * SCRUM-56, escenario 2: la transaccion simulada del reembolso, vinculada
+     * a la reserva (y, por ella, a su cargo original). Si la cancelacion es
+     * tan tardia que no hay nada que devolver, no se registra nada: la tabla
+     * pago exige monto > 0.
+     */
+    private void registrarReembolso(Reserva reserva, BigDecimal devolucion) {
+        if (devolucion.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        pagoRepository.save(new Pago(reserva, TipoPago.REEMBOLSO, "sim_reembolso_" + UUID.randomUUID(),
+                devolucion, MONEDA, EstadoPago.EXITOSO, OffsetDateTime.now()));
     }
 
     private Reserva reservaDelHuesped(String correo, Integer idReserva) {

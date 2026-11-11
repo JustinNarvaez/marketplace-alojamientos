@@ -211,6 +211,11 @@ public class ManejadorGlobalExcepciones {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(PagoNoEncontradoException.class)
+    public ResponseEntity<ErrorResponse> manejar(PagoNoEncontradoException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> manejar(MethodArgumentNotValidException ex) {
         String mensaje = ex.getBindingResult().getFieldErrors().stream()

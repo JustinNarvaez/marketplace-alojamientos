@@ -19,4 +19,8 @@ public interface PagoRepository extends JpaRepository<Pago, Integer> {
 
     // SCRUM-55: el webhook de Stripe identifica el pago por el id del PaymentIntent.
     Optional<Pago> findByReferenciaExterna(String referenciaExterna);
+
+    // SCRUM-56: el pago mas reciente de una reserva (cargo o reembolso), para
+    // mostrar su estado actual al consultar el detalle.
+    Optional<Pago> findFirstByReserva_IdReservaOrderByFechaDesc(Integer idReserva);
 }

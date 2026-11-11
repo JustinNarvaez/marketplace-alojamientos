@@ -2,7 +2,9 @@ package co.edu.unbosque.marketplace.service;
 
 import co.edu.unbosque.marketplace.dto.CrearIntentoPagoRequest;
 import co.edu.unbosque.marketplace.dto.IntentoPagoResponse;
+import co.edu.unbosque.marketplace.dto.PagoResponse;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
+import co.edu.unbosque.marketplace.exception.PagoNoEncontradoException;
 import co.edu.unbosque.marketplace.exception.ReservaNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.ServicioPagoNoDisponibleException;
 import co.edu.unbosque.marketplace.exception.WebhookStripeInvalidoException;
@@ -14,6 +16,7 @@ import co.edu.unbosque.marketplace.model.enums.EstadoPago;
 import co.edu.unbosque.marketplace.model.enums.ResultadoAuditoria;
 import co.edu.unbosque.marketplace.model.enums.TipoEventoAuditoria;
 import co.edu.unbosque.marketplace.model.enums.TipoPago;
+import co.edu.unbosque.marketplace.repository.AdminRepository;
 import co.edu.unbosque.marketplace.repository.NotificacionRepository;
 import co.edu.unbosque.marketplace.repository.PagoRepository;
 import co.edu.unbosque.marketplace.repository.ReservaRepository;
@@ -46,6 +49,7 @@ public class PagoService {
     private final PagoRepository pagoRepository;
     private final ReservaRepository reservaRepository;
     private final UsuarioRepository usuarioRepository;
+    private final AdminRepository adminRepository;
     private final DisponibilidadService disponibilidadService;
     private final NotificacionRepository notificacionRepository;
     private final ServicioAuditoria servicioAuditoria;
@@ -53,13 +57,15 @@ public class PagoService {
     private final String clavePublica;
 
     public PagoService(PagoRepository pagoRepository, ReservaRepository reservaRepository,
-                       UsuarioRepository usuarioRepository, DisponibilidadService disponibilidadService,
+                       UsuarioRepository usuarioRepository, AdminRepository adminRepository,
+                       DisponibilidadService disponibilidadService,
                        NotificacionRepository notificacionRepository, ServicioAuditoria servicioAuditoria,
                        @Value("${app.stripe.webhook-secret}") String webhookSecret,
                        @Value("${app.stripe.public-key}") String clavePublica) {
         this.pagoRepository = pagoRepository;
         this.reservaRepository = reservaRepository;
         this.usuarioRepository = usuarioRepository;
+        this.adminRepository = adminRepository;
         this.disponibilidadService = disponibilidadService;
         this.notificacionRepository = notificacionRepository;
         this.servicioAuditoria = servicioAuditoria;
@@ -186,5 +192,29 @@ public class PagoService {
     private PaymentIntent extraerPaymentIntent(Event event) {
         return (PaymentIntent) event.getDataObjectDeserializer().getObject()
                 .orElseThrow(WebhookStripeInvalidoException::new);
+    }
+
+    /**
+     * SCRUM-56, escenario 3. El huesped y el anfitrion de la reserva la ven
+     * igual que el resto del detalle (Reserva.esVisiblePara); un administrador
+     * la ve sin ser dueno de ninguna de las dos partes, para la trazabilidad
+     * de pagos y devoluciones. 404 si la reserva no existe, no es visible, o
+     * todavia no tiene ningun pago (p. ej. una reserva inmediata que nunca
+     * paso por Stripe).
+     */
+    @Transactional(readOnly = true)
+    public PagoResponse consultarEstado(String correo, Integer idReserva) {
+        Usuario usuario = usuarioRepository.findByEmail(correo).orElseThrow(CredencialesInvalidasException::new);
+        Reserva reserva = reservaRepository.findById(idReserva).orElseThrow(ReservaNoEncontradaException::new);
+        boolean autorizado = reserva.esVisiblePara(usuario.getIdUsuario())
+                || adminRepository.existsById(usuario.getIdUsuario());
+        if (!autorizado) {
+            throw new ReservaNoEncontradaException();
+        }
+
+        Pago pago = pagoRepository.findFirstByReserva_IdReservaOrderByFechaDesc(idReserva)
+                .orElseThrow(PagoNoEncontradoException::new);
+        return new PagoResponse(pago.getIdPago(), reserva.getIdReserva(), pago.getTipo().name(), pago.getMonto(),
+                pago.getMoneda(), pago.getEstado().name(), pago.getFecha());
     }
 }

@@ -2,6 +2,8 @@ package co.edu.unbosque.marketplace.service;
 
 import co.edu.unbosque.marketplace.dto.CrearIntentoPagoRequest;
 import co.edu.unbosque.marketplace.dto.IntentoPagoResponse;
+import co.edu.unbosque.marketplace.dto.PagoResponse;
+import co.edu.unbosque.marketplace.exception.PagoNoEncontradoException;
 import co.edu.unbosque.marketplace.exception.ReservaNoConfirmableException;
 import co.edu.unbosque.marketplace.exception.ReservaNoEncontradaException;
 import co.edu.unbosque.marketplace.exception.ServicioPagoNoDisponibleException;
@@ -21,6 +23,7 @@ import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
 import co.edu.unbosque.marketplace.model.enums.TipoAlojamiento;
 import co.edu.unbosque.marketplace.model.enums.TipoEventoAuditoria;
 import co.edu.unbosque.marketplace.model.enums.TipoPago;
+import co.edu.unbosque.marketplace.repository.AdminRepository;
 import co.edu.unbosque.marketplace.repository.NotificacionRepository;
 import co.edu.unbosque.marketplace.repository.PagoRepository;
 import co.edu.unbosque.marketplace.repository.ReservaRepository;
@@ -66,6 +69,8 @@ class PagoServiceTest {
     @Mock
     private UsuarioRepository usuarioRepository;
     @Mock
+    private AdminRepository adminRepository;
+    @Mock
     private DisponibilidadService disponibilidadService;
     @Mock
     private NotificacionRepository notificacionRepository;
@@ -78,8 +83,8 @@ class PagoServiceTest {
 
     @BeforeEach
     void preparar() {
-        pagoService = new PagoService(pagoRepository, reservaRepository, usuarioRepository, disponibilidadService,
-                notificacionRepository, servicioAuditoria, WEBHOOK_SECRET, CLAVE_PUBLICA);
+        pagoService = new PagoService(pagoRepository, reservaRepository, usuarioRepository, adminRepository,
+                disponibilidadService, notificacionRepository, servicioAuditoria, WEBHOOK_SECRET, CLAVE_PUBLICA);
         huesped = usuario(5, "Laura", CORREO);
         reserva = unaReserva(EstadoReserva.PENDIENTE_APROBACION);
     }
@@ -262,6 +267,64 @@ class PagoServiceTest {
         assertEquals(EstadoPago.FALLIDO, pago.getEstado());
         verify(disponibilidadService, never()).confirmarReservaYBloquear(any());
         verify(notificacionRepository).save(any(Notificacion.class));
+    }
+
+    @Test
+    void escenario3_elHuespedVeElEstadoDeSuPago() {
+        when(usuarioRepository.findByEmail(CORREO)).thenReturn(Optional.of(huesped));
+        when(reservaRepository.findById(10)).thenReturn(Optional.of(reserva));
+        Pago pago = new Pago(reserva, TipoPago.CARGO, "pi_ok", reserva.getTotal(), "COP", EstadoPago.EXITOSO,
+                OffsetDateTime.now());
+        when(pagoRepository.findFirstByReserva_IdReservaOrderByFechaDesc(10)).thenReturn(Optional.of(pago));
+
+        PagoResponse respuesta = pagoService.consultarEstado(CORREO, 10);
+
+        assertEquals(10, respuesta.idReserva());
+        assertEquals("CARGO", respuesta.tipo());
+        assertEquals("EXITOSO", respuesta.estado());
+        assertEquals(reserva.getTotal(), respuesta.monto());
+    }
+
+    @Test
+    void escenario3_unAdministradorVeElPagoDeUnaReservaAjena() {
+        Usuario admin = usuario(99, "Ana", "admin@ejemplo.com");
+        when(usuarioRepository.findByEmail("admin@ejemplo.com")).thenReturn(Optional.of(admin));
+        when(reservaRepository.findById(10)).thenReturn(Optional.of(reserva));
+        when(adminRepository.existsById(99)).thenReturn(true);
+        Pago pago = new Pago(reserva, TipoPago.REEMBOLSO, "sim_1", new BigDecimal("200000.00"), "COP",
+                EstadoPago.EXITOSO, OffsetDateTime.now());
+        when(pagoRepository.findFirstByReserva_IdReservaOrderByFechaDesc(10)).thenReturn(Optional.of(pago));
+
+        PagoResponse respuesta = pagoService.consultarEstado("admin@ejemplo.com", 10);
+
+        assertEquals("REEMBOLSO", respuesta.tipo());
+    }
+
+    @Test
+    void unUsuarioQueNoEsDuenoNiAdminNoVeElPago() {
+        Usuario otro = usuario(42, "Pedro", "otro@ejemplo.com");
+        when(usuarioRepository.findByEmail("otro@ejemplo.com")).thenReturn(Optional.of(otro));
+        when(reservaRepository.findById(10)).thenReturn(Optional.of(reserva));
+        when(adminRepository.existsById(42)).thenReturn(false);
+
+        assertThrows(ReservaNoEncontradaException.class, () -> pagoService.consultarEstado("otro@ejemplo.com", 10));
+    }
+
+    @Test
+    void unaReservaSinNingunPagoRespondeNoEncontrado() {
+        when(usuarioRepository.findByEmail(CORREO)).thenReturn(Optional.of(huesped));
+        when(reservaRepository.findById(10)).thenReturn(Optional.of(reserva));
+        when(pagoRepository.findFirstByReserva_IdReservaOrderByFechaDesc(10)).thenReturn(Optional.empty());
+
+        assertThrows(PagoNoEncontradoException.class, () -> pagoService.consultarEstado(CORREO, 10));
+    }
+
+    @Test
+    void unaReservaInexistenteRespondeNoEncontrada() {
+        when(usuarioRepository.findByEmail(CORREO)).thenReturn(Optional.of(huesped));
+        when(reservaRepository.findById(123)).thenReturn(Optional.empty());
+
+        assertThrows(ReservaNoEncontradaException.class, () -> pagoService.consultarEstado(CORREO, 123));
     }
 
     private static PaymentIntent mockIntent(String id, String clientSecret) {

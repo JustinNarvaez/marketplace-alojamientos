@@ -11,17 +11,21 @@ import co.edu.unbosque.marketplace.model.Anfitrion;
 import co.edu.unbosque.marketplace.model.Cancelacion;
 import co.edu.unbosque.marketplace.model.Huesped;
 import co.edu.unbosque.marketplace.model.Notificacion;
+import co.edu.unbosque.marketplace.model.Pago;
 import co.edu.unbosque.marketplace.model.PoliticaCancelacion;
 import co.edu.unbosque.marketplace.model.Publicacion;
 import co.edu.unbosque.marketplace.model.Reserva;
 import co.edu.unbosque.marketplace.model.Usuario;
 import co.edu.unbosque.marketplace.model.enums.EstadoCuenta;
+import co.edu.unbosque.marketplace.model.enums.EstadoPago;
 import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
 import co.edu.unbosque.marketplace.model.enums.EstadoReserva;
 import co.edu.unbosque.marketplace.model.enums.TipoAlojamiento;
 import co.edu.unbosque.marketplace.model.enums.TipoEventoAuditoria;
+import co.edu.unbosque.marketplace.model.enums.TipoPago;
 import co.edu.unbosque.marketplace.repository.CancelacionRepository;
 import co.edu.unbosque.marketplace.repository.NotificacionRepository;
+import co.edu.unbosque.marketplace.repository.PagoRepository;
 import co.edu.unbosque.marketplace.repository.ReservaRepository;
 import co.edu.unbosque.marketplace.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,6 +68,8 @@ class CancelacionServiceTest {
     private DisponibilidadService disponibilidadService;
     @Mock
     private ServicioAuditoria servicioAuditoria;
+    @Mock
+    private PagoRepository pagoRepository;
 
     private CancelacionService cancelacionService;
     private Usuario huesped;
@@ -72,7 +78,7 @@ class CancelacionServiceTest {
     @BeforeEach
     void preparar() {
         cancelacionService = new CancelacionService(cancelacionRepository, reservaRepository, usuarioRepository,
-                notificacionRepository, disponibilidadService, servicioAuditoria);
+                notificacionRepository, disponibilidadService, servicioAuditoria, pagoRepository);
         huesped = usuario(5, "Laura", CORREO);
         anfitrion = usuario(7, "Mario", "mario@ejemplo.com");
     }
@@ -125,6 +131,37 @@ class CancelacionServiceTest {
     }
 
     @Test
+    void escenario2_registraElReembolsoVinculadoALaReserva() {
+        Reserva reserva = unaReserva(EstadoReserva.CONFIRMADA, LocalDate.now().plusDays(2));
+        prepararReserva(reserva);
+        when(cancelacionRepository.save(any(Cancelacion.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+
+        cancelacionService.cancelar(CORREO, 10, new CancelarReservaRequest("Cambio de planes"), "127.0.0.1");
+
+        ArgumentCaptor<Pago> pagoCaptor = ArgumentCaptor.forClass(Pago.class);
+        verify(pagoRepository).save(pagoCaptor.capture());
+        Pago reembolso = pagoCaptor.getValue();
+        assertEquals(reserva, reembolso.getReserva());
+        assertEquals(TipoPago.REEMBOLSO, reembolso.getTipo());
+        assertEquals(EstadoPago.EXITOSO, reembolso.getEstado());
+        assertEquals(new BigDecimal("200000.00"), reembolso.getMonto());
+    }
+
+    @Test
+    void siLaDevolucionEsCeroNoSeRegistraNingunReembolso() {
+        // MODERADA el mismo dia de llegada: 0 % de devolucion.
+        Reserva reserva = unaReserva(EstadoReserva.CONFIRMADA, LocalDate.now());
+        prepararReserva(reserva);
+        when(cancelacionRepository.save(any(Cancelacion.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+
+        CancelacionResponse respuesta = cancelacionService.cancelar(CORREO, 10,
+                new CancelarReservaRequest("Ya no puedo viajar"), "127.0.0.1");
+
+        assertEquals(0, respuesta.valorDevolucion().compareTo(BigDecimal.ZERO));
+        verify(pagoRepository, never()).save(any());
+    }
+
+    @Test
     void conAnticipacionSuficienteLaDevolucionEsTotal() {
         Reserva reserva = unaReserva(EstadoReserva.CONFIRMADA, LocalDate.now().plusDays(20));
         prepararReserva(reserva);
@@ -164,7 +201,8 @@ class CancelacionServiceTest {
                 () -> cancelacionService.cancelar(CORREO, 10, solicitud, "127.0.0.1"));
 
         verify(reservaRepository, never()).save(any());
-        verifyNoInteractions(cancelacionRepository, notificacionRepository, disponibilidadService, servicioAuditoria);
+        verifyNoInteractions(cancelacionRepository, notificacionRepository, disponibilidadService, servicioAuditoria,
+                pagoRepository);
     }
 
     @Test
