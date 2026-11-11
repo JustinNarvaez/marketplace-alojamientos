@@ -117,6 +117,11 @@ export default function DetalleReserva({ vista }: { vista: VistaReservas }) {
                             {termino ? 'Reseñar alojamiento' : 'Ver alojamiento'}
                         </Button>
                     )}
+                    {vista === 'huesped' && reserva.estado === 'PENDIENTE_APROBACION' && (
+                        <Button variant="contained" component={RouterLink} to={`/mis-reservas/${reserva.idReserva}/pagar`}>
+                            Pagar reserva
+                        </Button>
+                    )}
                     {vista === 'huesped' && reserva.estado === 'CONFIRMADA' && !termino && (
                         <Button variant="outlined" color="error" component={RouterLink}
                                 to={`/mis-reservas/${reserva.idReserva}/cancelar`}>

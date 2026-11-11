@@ -24,6 +24,8 @@ tags:
   description: Políticas que el anfitrión asocia a su publicación (SCRUM-42).
 - name: Cotizaciones
   description: Cotización de una estancia con desglose de tarifas (SCRUM-36).
+- name: Pagos
+  description: Pago simulado de una reserva con Stripe en modo pruebas (SCRUM-55).
 - name: Administración de reseñas
   description: Moderación de reseñas por el administrador (SCRUM-50).
 - name: Auditoría
@@ -696,6 +698,82 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
           description: El periodo no está disponible
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+      - bearerAuth: []
+  /api/payments/webhook:
+    post:
+      tags:
+      - Pagos
+      summary: Webhook de Stripe
+      description: "Lo llama Stripe, no el frontend. Verifica la firma con app.stripe.webhook-secret."
+      operationId: webhook
+      parameters:
+      - name: Stripe-Signature
+        in: header
+        description: Firma HMAC que Stripe adjunta a cada evento.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        "200":
+          description: Evento procesado (o ignorado si no es de interés)
+        "400":
+          description: Firma inválida
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/payments/intent:
+    post:
+      tags:
+      - Pagos
+      summary: Iniciar el pago de una reserva
+      description: Crea (o reutiliza) un PaymentIntent de Stripe para una reserva
+        PENDIENTE_APROBACION del huésped autenticado.
+      operationId: crearIntento
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CrearIntentoPagoRequest"
+        required: true
+      responses:
+        "200":
+          description: Intento de pago listo; el frontend confirma con clienteSecreto
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/IntentoPagoResponse"
+        "401":
+          description: Falta el token o ya venció
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La reserva no existe o no es tuya
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: La reserva no está pendiente de aprobación/pago
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Stripe no respondió; se puede reintentar
           content:
             '*/*':
               schema:
@@ -2206,6 +2284,7 @@ paths:
           - AUTENTICACION
           - PUBLICACION
           - RESERVA
+          - PAGO
           - CANCELACION
           - RESENA
           - EXPORTACION
@@ -2707,6 +2786,30 @@ components:
           type: number
         total:
           type: number
+    CrearIntentoPagoRequest:
+      type: object
+      properties:
+        idReserva:
+          type: integer
+          format: int32
+      required:
+      - idReserva
+    IntentoPagoResponse:
+      type: object
+      properties:
+        idReserva:
+          type: integer
+          format: int32
+        clienteSecreto:
+          type: string
+        monto:
+          type: number
+        moneda:
+          type: string
+        estado:
+          type: string
+        clavePublica:
+          type: string
     CrearPublicacionRequest:
       type: object
       properties:

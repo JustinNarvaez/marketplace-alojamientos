@@ -9,6 +9,7 @@ import RestablecerContrasena from './paginas/RestablecerContrasena'
 import NoAutorizado from './paginas/NoAutorizado'
 import NoEncontrado from './paginas/NoEncontrado'
 import CancelarReserva from './paginas/CancelarReserva'
+import PagarReserva from './paginas/PagarReserva'
 import MisReservas from './paginas/MisReservas'
 import ReservasRecibidas from './paginas/ReservasRecibidas'
 import DetalleReserva from './paginas/DetalleReserva'
@@ -49,6 +50,7 @@ export default function App() {
                     <Route path="mis-reservas" element={<MisReservas />} />
                     <Route path="mis-reservas/:idReserva" element={<DetalleReserva vista="huesped" />} />
                     <Route path="mis-reservas/:idReserva/cancelar" element={<CancelarReserva />} />
+                    <Route path="mis-reservas/:idReserva/pagar" element={<PagarReserva />} />
                 </Route>
                 <Route element={<RutaProtegida roles={['ANFITRION']} />}>
                     <Route path="mis-publicaciones" element={<MisPublicaciones />} />
