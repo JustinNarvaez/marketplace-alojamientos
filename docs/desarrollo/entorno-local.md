@@ -246,10 +246,10 @@ Todas las cuentas usan la clave `Prueba123`:
 | Correo | Rol |
 |---|---|
 | `admin@prueba.com` | ADMINISTRADOR |
-| `anfitrion@prueba.com` | ANFITRION, con 3 publicaciones (ACTIVA, ACTIVA y BORRADOR) |
-| `anfitrion2@prueba.com` | ANFITRION, con 2 publicaciones (ACTIVA y PAUSADA) |
-| `huesped@prueba.com`, `huesped2@prueba.com` | HUESPED |
-| `mixto@prueba.com` | HUESPED y ANFITRION a la vez |
+| `anfitrion@prueba.com` | ANFITRION, con 5 publicaciones (3 ACTIVA, 1 BORRADOR requiere aprobación, 1 ACTIVA requiere aprobación) |
+| `anfitrion2@prueba.com` | ANFITRION, con 4 publicaciones (3 ACTIVA, 1 PAUSADA) |
+| `huesped@prueba.com`, `huesped2@prueba.com` | HUESPED, cada uno con reservas en distintos estados (CONFIRMADA, PENDIENTE_APROBACION, CANCELADA) |
+| `mixto@prueba.com` | HUESPED y ANFITRION a la vez, con 2 publicaciones propias y reservas como huésped (CONFIRMADA pasada con reseña, RECHAZADA) |
 
 Se puede correr las veces que se quiera: no duplica nada y deja las
 cuentas de prueba otra vez con clave `Prueba123` y en estado ACTIVA. No

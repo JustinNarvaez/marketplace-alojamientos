@@ -201,6 +201,23 @@ class BusquedaServiceTest {
         assertEquals(List.of(), resultados);
     }
 
+    // Regresion: buscar sin tildes debe encontrar una ciudad con tildes
+    // (V4__extension_unaccent.sql), igual que un huesped real escribiria
+    // "medellin" esperando encontrar "Medellín".
+    @Test
+    void buscarSinTildesEncuentraUnaCiudadConTildes() {
+        Anfitrion anfitrion = anfitrionRepository.save(new Anfitrion(usuarioRepository.save(
+                new Usuario("Ana", "Gomez", "busqueda-tilde-test@ejemplo.com", "hash", null,
+                        OffsetDateTime.now(), EstadoCuenta.ACTIVA))));
+        Publicacion conTilde = publicacionCon(anfitrion, "Publicacion con tilde", TipoAlojamiento.APARTAMENTO,
+                (short) 2, "CiudadPrueBáTildeBusqueda", new BigDecimal("100000"), EstadoPublicacion.ACTIVA, Set.of());
+
+        List<ResultadoBusquedaResponse> resultados = busquedaService.buscar(
+                filtros("ciudadpruebatildebusqueda", null, null, null, null, null, null, null));
+
+        assertEquals(List.of(conTilde.getIdPublicacion()), idsDe(resultados));
+    }
+
     @Test
     void escenario3_sinCoincidenciasDevuelveListaVacia() {
         List<ResultadoBusquedaResponse> resultados = busquedaService.buscar(
