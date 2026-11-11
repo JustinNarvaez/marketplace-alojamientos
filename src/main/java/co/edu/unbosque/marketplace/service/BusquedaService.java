@@ -8,6 +8,7 @@ import co.edu.unbosque.marketplace.model.Publicacion;
 import co.edu.unbosque.marketplace.model.enums.EstadoPublicacion;
 import co.edu.unbosque.marketplace.repository.ImagenRepository;
 import co.edu.unbosque.marketplace.repository.PublicacionRepository;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
@@ -91,8 +92,13 @@ public class BusquedaService {
 
             var alojamiento = root.join("alojamiento");
             if (filtros.ciudad() != null && !filtros.ciudad().isBlank()) {
+                // unaccent (requiere la extension, V4__extension_unaccent.sql) en los
+                // dos lados: sin esto, "medellin" no encontraria "Medellín".
                 String patron = "%" + escaparComodines(filtros.ciudad().trim().toLowerCase()) + "%";
-                condiciones.add(cb.like(cb.lower(alojamiento.get("ciudad")), patron, ESCAPE_LIKE));
+                Expression<String> ciudadSinTildes =
+                        cb.function("unaccent", String.class, cb.lower(alojamiento.get("ciudad")));
+                Expression<String> patronSinTildes = cb.function("unaccent", String.class, cb.literal(patron));
+                condiciones.add(cb.like(ciudadSinTildes, patronSinTildes, ESCAPE_LIKE));
             }
             if (filtros.tipo() != null) {
                 condiciones.add(cb.equal(alojamiento.get("tipoAlojamiento"), filtros.tipo()));
