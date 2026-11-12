@@ -13,8 +13,9 @@ import {
     TextField,
     Typography,
 } from '@mui/material'
-import { Link as RouterLink } from 'react-router-dom'
+import { Link as RouterLink, useLocation } from 'react-router-dom'
 import { pedir, ErrorApi } from '../api/cliente'
+import { usarSesion } from '../sesion/SesionContext'
 
 // Coincide con ServicioAdicionalResponse del backend
 interface ServicioAdicional {
@@ -55,6 +56,8 @@ function hoy(): string {
  * (SCRUM-35): se usa como <Cotizador idPublicacion={...} />.
  */
 export default function Cotizador({ idPublicacion }: { idPublicacion: number }) {
+    const { autenticado } = usarSesion()
+    const ubicacion = useLocation()
     const [llegada, setLlegada] = useState('')
     const [salida, setSalida] = useState('')
     const [huespedes, setHuespedes] = useState('1')
@@ -236,9 +239,18 @@ export default function Cotizador({ idPublicacion }: { idPublicacion: number }) 
                     </Stack>
 
                     {errorReserva && <Alert severity="error">{errorReserva}</Alert>}
-                    <Button variant="contained" color="secondary" disabled={confirmando} onClick={confirmarReserva}>
-                        {confirmando ? 'Confirmando…' : puedeReintentar ? 'Reintentar' : 'Confirmar reserva'}
-                    </Button>
+                    {autenticado ? (
+                        <Button variant="contained" color="secondary" disabled={confirmando} onClick={confirmarReserva}>
+                            {confirmando ? 'Confirmando…' : puedeReintentar ? 'Reintentar' : 'Confirmar reserva'}
+                        </Button>
+                    ) : (
+                        // SCRUM-68: se cotiza sin sesion, pero confirmar la reserva
+                        // si la exige; mismo patron de "desde" que RutaProtegida.
+                        <Button variant="contained" color="secondary" component={RouterLink}
+                                to="/iniciar-sesion" state={{ desde: ubicacion.pathname }}>
+                            Inicia sesión para reservar
+                        </Button>
+                    )}
                 </Stack>
             )}
 
