@@ -28,7 +28,11 @@
 --
 -- Publicaciones (una por estado util para probar), 11 en total en 10
 -- ciudades (varias con tilde, a proposito: el buscador de Inicio.tsx
--- ahora ignora tildes ademas de mayusculas, ver V4__extension_unaccent.sql):
+-- ahora ignora tildes ademas de mayusculas, ver V4__extension_unaccent.sql).
+-- Cada una con 4 o 5 fotos reales de Unsplash (licencia Unsplash, uso
+-- libre), elegidas por categoria -sala, habitacion, bano, cocina, vista,
+-- piscina, caballos, playa- para que coincidan con la descripcion en vez
+-- de ser una foto aleatoria sin relacion (como el picsum.photos de antes):
 --   Apartamento en El Poblado      (Mario) ACTIVA     FLEXIBLE  reserva inmediata, con extras y un bloqueo
 --   Casa campestre en Guatape      (Mario) ACTIVA     MODERADA  requiere aprobacion del anfitrion
 --   Cabana en La Calera            (Mario) BORRADOR   ESTRICTA  (no se puede cotizar)
@@ -126,6 +130,7 @@ DECLARE
     v_anfitrion   INTEGER;
     v_alojamiento INTEGER;
     v_publicacion INTEGER;
+    v_es_nueva    BOOLEAN := TRUE;
 BEGIN
     SELECT id_usuario INTO v_anfitrion FROM usuario WHERE email = p_correo;
 
@@ -135,28 +140,34 @@ BEGIN
     WHERE a.id_anfitrion = v_anfitrion AND p.titulo = p_titulo;
 
     IF v_publicacion IS NOT NULL THEN
-        RETURN v_publicacion;
+        v_es_nueva := FALSE;
+    ELSE
+        INSERT INTO alojamiento (id_anfitrion, tipo_alojamiento, capacidad, ciudad, direccion, ubicacion)
+        VALUES (v_anfitrion, p_tipo, p_capacidad, p_ciudad, p_direccion, p_ubicacion)
+        RETURNING id_alojamiento INTO v_alojamiento;
+
+        INSERT INTO publicacion (id_alojamiento, id_politica_cancelacion, titulo, descripcion,
+                                 precio_noche, tarifa_limpieza, reserva_inmediata, estado, fecha_publicacion)
+        SELECT v_alojamiento, id_politica, p_titulo, p_descripcion,
+               p_precio, p_limpieza, TRUE, p_estado,
+               CASE WHEN p_estado = 'BORRADOR' THEN NULL ELSE now() END
+        FROM politica_cancelacion
+        WHERE nombre = p_politica
+        RETURNING id_publicacion INTO v_publicacion;
+
+        INSERT INTO publicacion_servicio (id_publicacion, id_servicio)
+        SELECT v_publicacion, id_servicio FROM servicio WHERE nombre = ANY (p_servicios);
+
+        INSERT INTO regla_alojamiento (id_publicacion, descripcion, orden)
+        SELECT v_publicacion, regla, orden::SMALLINT
+        FROM unnest(p_reglas) WITH ORDINALITY AS r(regla, orden);
     END IF;
 
-    INSERT INTO alojamiento (id_anfitrion, tipo_alojamiento, capacidad, ciudad, direccion, ubicacion)
-    VALUES (v_anfitrion, p_tipo, p_capacidad, p_ciudad, p_direccion, p_ubicacion)
-    RETURNING id_alojamiento INTO v_alojamiento;
-
-    INSERT INTO publicacion (id_alojamiento, id_politica_cancelacion, titulo, descripcion,
-                             precio_noche, tarifa_limpieza, reserva_inmediata, estado, fecha_publicacion)
-    SELECT v_alojamiento, id_politica, p_titulo, p_descripcion,
-           p_precio, p_limpieza, TRUE, p_estado,
-           CASE WHEN p_estado = 'BORRADOR' THEN NULL ELSE now() END
-    FROM politica_cancelacion
-    WHERE nombre = p_politica
-    RETURNING id_publicacion INTO v_publicacion;
-
-    INSERT INTO publicacion_servicio (id_publicacion, id_servicio)
-    SELECT v_publicacion, id_servicio FROM servicio WHERE nombre = ANY (p_servicios);
-
-    INSERT INTO regla_alojamiento (id_publicacion, descripcion, orden)
-    SELECT v_publicacion, regla, orden::SMALLINT
-    FROM unnest(p_reglas) WITH ORDINALITY AS r(regla, orden);
+    -- Las imagenes se sincronizan siempre, incluso si la publicacion ya
+    -- existia: asi una base local que corrio una version anterior de este
+    -- script (con fotos genericas de picsum.photos) queda con las fotos
+    -- reales actuales en vez de arrastrar las viejas para siempre.
+    DELETE FROM imagen WHERE id_publicacion = v_publicacion;
 
     -- La primera imagen es la portada (uq_imagen_una_portada: solo una por publicacion).
     INSERT INTO imagen (id_publicacion, ruta, orden, es_portada)
@@ -174,7 +185,10 @@ SELECT pg_temp.publicacion_de_prueba(
     180000, 40000, 'ACTIVA', 'FLEXIBLE',
     ARRAY['WiFi', 'Cocina equipada', 'Aire acondicionado'],
     ARRAY['No fumar dentro del apartamento', 'No se permiten fiestas', 'Check-in después de las 3 p. m.'],
-    ARRAY['https://picsum.photos/seed/poblado1/800/500', 'https://picsum.photos/seed/poblado2/800/500']);
+    ARRAY['https://images.unsplash.com/photo-1769251846390-772c3a74b0da?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1632829401795-2745c905ac77?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1646592491820-49bafd614c0e?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'anfitrion@prueba.com', 'Casa campestre en Guatapé',
@@ -183,7 +197,10 @@ SELECT pg_temp.publicacion_de_prueba(
     350000, 80000, 'ACTIVA', 'MODERADA',
     ARRAY['WiFi', 'Piscina', 'Parqueadero', 'Cocina equipada', 'Lavadora'],
     ARRAY['Mascotas permitidas con aviso previo', 'Silencio después de las 10 p. m.'],
-    ARRAY['https://picsum.photos/seed/guatape1/800/500']);
+    ARRAY['https://images.unsplash.com/photo-1739372993408-71a330cfce04?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1747171979433-e027641bbe42?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1768488314310-3742b3c75579?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'anfitrion@prueba.com', 'Cabaña en La Calera',
@@ -192,7 +209,10 @@ SELECT pg_temp.publicacion_de_prueba(
     220000, 30000, 'BORRADOR', 'ESTRICTA',
     ARRAY['WiFi'],
     ARRAY['Llevar ropa abrigada'],
-    ARRAY[]::TEXT[]);
+    ARRAY['https://images.unsplash.com/photo-1768488314310-3742b3c75579?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1759443602064-3b5e58ffa55d?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'anfitrion2@prueba.com', 'Habitación en Chapinero',
@@ -201,7 +221,10 @@ SELECT pg_temp.publicacion_de_prueba(
     90000, 0, 'ACTIVA', 'FLEXIBLE',
     ARRAY['WiFi', 'Lavadora'],
     ARRAY['Solo una persona', 'No visitas después de las 9 p. m.'],
-    ARRAY['https://picsum.photos/seed/chapinero1/800/500']);
+    ARRAY['https://images.unsplash.com/photo-1632829401795-2745c905ac77?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1646592491820-49bafd614c0e?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1769251846390-772c3a74b0da?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'anfitrion2@prueba.com', 'Apartamento en Bocagrande',
@@ -210,7 +233,10 @@ SELECT pg_temp.publicacion_de_prueba(
     420000, 60000, 'PAUSADA', 'MODERADA',
     ARRAY['WiFi', 'Piscina', 'Aire acondicionado'],
     ARRAY['No fumar'],
-    ARRAY['https://picsum.photos/seed/bocagrande1/800/500']);
+    ARRAY['https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1747171979433-e027641bbe42?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1646592491820-49bafd614c0e?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'anfitrion@prueba.com', 'Finca en Villa de Leyva',
@@ -219,7 +245,11 @@ SELECT pg_temp.publicacion_de_prueba(
     280000, 70000, 'ACTIVA', 'FLEXIBLE',
     ARRAY['WiFi', 'Parqueadero'],
     ARRAY['No se permiten fiestas', 'Mascotas con aviso previo'],
-    ARRAY['https://picsum.photos/seed/villadeleyva1/800/500']);
+    ARRAY['https://images.unsplash.com/photo-1562058256-22ee52fe4068?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1768011849522-6627ee0b4608?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1739372993408-71a330cfce04?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'anfitrion@prueba.com', 'Loft en Laureles',
@@ -228,7 +258,10 @@ SELECT pg_temp.publicacion_de_prueba(
     150000, 25000, 'ACTIVA', 'MODERADA',
     ARRAY['WiFi', 'Aire acondicionado', 'Lavadora'],
     ARRAY['No fumar dentro del loft'],
-    ARRAY['https://picsum.photos/seed/laureles1/800/500']);
+    ARRAY['https://images.unsplash.com/photo-1769251846390-772c3a74b0da?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1632829401795-2745c905ac77?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1646592491820-49bafd614c0e?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'anfitrion2@prueba.com', 'Casa en Cali',
@@ -237,7 +270,10 @@ SELECT pg_temp.publicacion_de_prueba(
     250000, 50000, 'ACTIVA', 'MODERADA',
     ARRAY['WiFi', 'Parqueadero', 'Cocina equipada'],
     ARRAY['No mascotas'],
-    ARRAY['https://picsum.photos/seed/cali1/800/500']);
+    ARRAY['https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1719324923613-ff0884b031ed?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'anfitrion2@prueba.com', 'Apartahotel en Santa Marta',
@@ -246,7 +282,10 @@ SELECT pg_temp.publicacion_de_prueba(
     310000, 45000, 'ACTIVA', 'FLEXIBLE',
     ARRAY['WiFi', 'Piscina', 'Aire acondicionado'],
     ARRAY['Check-out antes de las 11 a. m.'],
-    ARRAY['https://picsum.photos/seed/santamarta1/800/500']);
+    ARRAY['https://images.unsplash.com/photo-1767206106944-b46f13deb9d6?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1747171979433-e027641bbe42?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1632829401795-2745c905ac77?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1646592491820-49bafd614c0e?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'mixto@prueba.com', 'Cabaña en Salento',
@@ -255,7 +294,10 @@ SELECT pg_temp.publicacion_de_prueba(
     230000, 35000, 'ACTIVA', 'FLEXIBLE',
     ARRAY['WiFi', 'Parqueadero'],
     ARRAY['Silencio después de las 9 p. m.'],
-    ARRAY['https://picsum.photos/seed/salento1/800/500']);
+    ARRAY['https://images.unsplash.com/photo-1768488314310-3742b3c75579?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1759443602064-3b5e58ffa55d?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'mixto@prueba.com', 'Apartamento en Bogotá',
@@ -264,7 +306,10 @@ SELECT pg_temp.publicacion_de_prueba(
     200000, 35000, 'ACTIVA', 'MODERADA',
     ARRAY['WiFi', 'Aire acondicionado'],
     ARRAY['No fiestas', 'No mascotas'],
-    ARRAY['https://picsum.photos/seed/bogota1/800/500']);
+    ARRAY['https://images.unsplash.com/photo-1769251846390-772c3a74b0da?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1632829401795-2745c905ac77?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=500&fit=crop&q=80']);
 
 -- Casa campestre en Guatapé pasa a requerir aprobación del anfitrión,
 -- para que la reserva PENDIENTE_APROBACION de más abajo (y las
