@@ -23,12 +23,23 @@ interface EstadoNavegacion {
     cerrarSesion?: boolean
 }
 
+// SCRUM-22, escenario 1 (defecto SCRUM-67): sin una pagina previa a la que
+// volver, cada rol entra a su propia vista. Un usuario puede tener varios
+// roles; se prioriza el de mas permisos.
+function vistaDelRol(roles: Rol[]): string {
+    if (roles.includes('ADMINISTRADOR')) return '/administracion'
+    if (roles.includes('ANFITRION')) return '/mis-publicaciones'
+    if (roles.includes('HUESPED')) return '/mis-reservas'
+    return '/'
+}
+
 export default function IniciarSesion() {
     const { iniciarSesion, cerrarSesion } = usarSesion()
     const navegar = useNavigate()
     const ubicacion = useLocation()
     const estadoNavegacion = ubicacion.state as EstadoNavegacion | null
-    const destino = estadoNavegacion?.desde ?? '/'
+    // Pagina protegida desde la que RutaProtegida mando a iniciar sesion (SCRUM-23).
+    const desde = estadoNavegacion?.desde
     // SCRUM-26: MiCuenta llega aqui tras desactivar la cuenta. La sesion se
     // cierra ya montada esta pagina (fuera de RutaProtegida) para no perder el aviso.
     const debeCerrarSesion = estadoNavegacion?.cerrarSesion === true
@@ -59,7 +70,7 @@ export default function IniciarSesion() {
                 { id: respuesta.id, nombre: respuesta.nombre, correo: respuesta.correo, roles: respuesta.roles },
                 respuesta.token,
             )
-            navegar(destino, { replace: true })
+            navegar(desde ?? vistaDelRol(respuesta.roles), { replace: true })
         } catch (err) {
             setError(err instanceof ErrorApi ? err.message : 'Ocurrió un error. Intenta más tarde')
             setPuedeReactivar(ruta === '/auth/login' && err instanceof ErrorApi && err.estado === 403)
