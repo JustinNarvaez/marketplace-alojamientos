@@ -7,7 +7,6 @@ import {
     FormControlLabel,
     FormLabel,
     Link as MuiLink,
-    Paper,
     Radio,
     RadioGroup,
     Stack,
@@ -16,6 +15,7 @@ import {
 } from '@mui/material'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import { pedir, ErrorApi } from '../api/cliente'
+import DisenoAutenticacion from '../componentes/DisenoAutenticacion'
 
 const PATRON_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PATRON_CONTRASENA = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/
@@ -67,8 +67,11 @@ export default function Registrarse() {
     }
 
     return (
-        <Paper sx={{ p: 4, maxWidth: 480, mx: 'auto' }}>
-            <Typography variant="h5" gutterBottom>Crear cuenta</Typography>
+        <DisenoAutenticacion>
+            <Typography variant="h4" gutterBottom sx={{ fontWeight: 700 }}>Crea tu cuenta</Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+                Únete para reservar o publicar alojamientos
+            </Typography>
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             {exito && (
                 <Alert severity="success" sx={{ mb: 2 }}>
@@ -127,13 +130,13 @@ export default function Registrarse() {
                         <FormControlLabel value="ANFITRION" control={<Radio />} label="Anfitrión" />
                     </RadioGroup>
                 </FormControl>
-                <Button type="submit" variant="contained" disabled={enviando} fullWidth>
+                <Button type="submit" variant="contained" color="secondary" size="large" disabled={enviando} fullWidth>
                     {enviando ? 'Creando…' : 'Crear cuenta'}
                 </Button>
                 <Typography variant="body2" color="text.secondary">
                     ¿Ya tienes cuenta? <MuiLink component={RouterLink} to="/iniciar-sesion">Inicia sesión</MuiLink>
                 </Typography>
             </Stack>
-        </Paper>
+        </DisenoAutenticacion>
     )
 }
