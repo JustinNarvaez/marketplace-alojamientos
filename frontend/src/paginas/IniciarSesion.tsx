@@ -1,11 +1,12 @@
 
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Alert, Button, Link as MuiLink, Paper, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Button, Link as MuiLink, Stack, TextField, Typography } from '@mui/material'
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom'
 import { usarSesion } from '../sesion/SesionContext'
 import type { Rol } from '../sesion/SesionContext'
 import { pedir, ErrorApi } from '../api/cliente'
+import DisenoAutenticacion from '../componentes/DisenoAutenticacion'
 
 
 // Coincide campo a campo con IniciarSesionResponse del backend (los DTO son el contrato)
@@ -85,8 +86,11 @@ export default function IniciarSesion() {
     }
 
     return (
-        <Paper sx={{ p: 4, maxWidth: 480, mx: 'auto' }}>
-            <Typography variant="h5" gutterBottom>Iniciar sesión</Typography>
+        <DisenoAutenticacion>
+            <Typography variant="h4" gutterBottom sx={{ fontWeight: 700 }}>Bienvenido de nuevo</Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+                Ingresa a tu cuenta para continuar
+            </Typography>
             {estadoNavegacion?.aviso && <Alert severity="info" sx={{ mb: 2 }}>{estadoNavegacion.aviso}</Alert>}
             {error && (
                 <Alert
@@ -121,7 +125,7 @@ export default function IniciarSesion() {
                     required
                     fullWidth
                 />
-                <Button type="submit" variant="contained" disabled={enviando} fullWidth>
+                <Button type="submit" variant="contained" color="secondary" size="large" disabled={enviando} fullWidth>
                     {enviando ? 'Entrando…' : 'Entrar'}
                 </Button>
                 <Typography variant="body2">
@@ -131,6 +135,6 @@ export default function IniciarSesion() {
                     ¿No tienes cuenta? <MuiLink component={RouterLink} to="/registrarse">Regístrate</MuiLink>
                 </Typography>
             </Stack>
-        </Paper>
+        </DisenoAutenticacion>
     )
 }

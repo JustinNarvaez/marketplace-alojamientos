@@ -32,10 +32,12 @@ import Dashboard from './paginas/Dashboard'
 export default function App() {
     return (
         <Routes>
+            {/* SCRUM-92: inicio de sesion y registro son pantalla completa,
+                sin la barra de navegacion del resto de la app. */}
+            <Route path="iniciar-sesion" element={<IniciarSesion />} />
+            <Route path="registrarse" element={<Registrarse />} />
             <Route element={<LayoutBase />}>
                 <Route index element={<Inicio />} />
-                <Route path="iniciar-sesion" element={<IniciarSesion />} />
-                <Route path="registrarse" element={<Registrarse />} />
                 <Route path="olvide-contrasena" element={<OlvideContrasena />} />
                 <Route path="restablecer-contrasena" element={<RestablecerContrasena />} />
                 <Route path="no-autorizado" element={<NoAutorizado />} />
