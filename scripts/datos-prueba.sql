@@ -26,13 +26,17 @@
 --   huesped2@prueba.com    HUESPED   (Sofia)
 --   mixto@prueba.com       HUESPED y ANFITRION a la vez (jerarquia solapada)
 --
--- Publicaciones (una por estado util para probar), 11 en total en 10
+-- Publicaciones (una por estado util para probar), 17 en total en 15
 -- ciudades (varias con tilde, a proposito: el buscador de Inicio.tsx
 -- ahora ignora tildes ademas de mayusculas, ver V4__extension_unaccent.sql).
 -- Cada una con 4 o 5 fotos reales de Unsplash (licencia Unsplash, uso
 -- libre), elegidas por categoria -sala, habitacion, bano, cocina, vista,
 -- piscina, caballos, playa- para que coincidan con la descripcion en vez
--- de ser una foto aleatoria sin relacion (como el picsum.photos de antes):
+-- de ser una foto aleatoria sin relacion (como el picsum.photos de antes).
+-- Cada publicacion tiene una portada distinta a las demas (SCRUM-95: antes
+-- se repetia la misma portada en 3 publicaciones, porque el pool de fotos
+-- era muy chico; Inicio.tsx solo muestra la portada en cada tarjeta, asi
+-- que una portada repetida se nota de inmediato en el grid):
 --   Apartamento en El Poblado      (Mario) ACTIVA     FLEXIBLE  reserva inmediata, con extras y un bloqueo
 --   Casa campestre en Guatape      (Mario) ACTIVA     MODERADA  requiere aprobacion del anfitrion
 --   Cabana en La Calera            (Mario) BORRADOR   ESTRICTA  (no se puede cotizar)
@@ -44,6 +48,12 @@
 --   Apartahotel en Santa Marta     (Laura) ACTIVA     FLEXIBLE  reserva inmediata
 --   Cabana en Salento              (Diego) ACTIVA     FLEXIBLE  reserva inmediata
 --   Apartamento en Bogota          (Diego) ACTIVA     MODERADA  reserva inmediata
+--   Apartamento en Cartagena       (Laura) ACTIVA     MODERADA  reserva inmediata (SCRUM-95)
+--   Casa en Armenia                (Diego) ACTIVA     FLEXIBLE  reserva inmediata (SCRUM-95)
+--   Loft en Usaquen (Bogota)       (Mario) ACTIVA     MODERADA  reserva inmediata (SCRUM-95)
+--   Cabana en San Gil              (Laura) ACTIVA     FLEXIBLE  reserva inmediata (SCRUM-95)
+--   Apartamento en Manizales       (Diego) ACTIVA     MODERADA  reserva inmediata (SCRUM-95)
+--   Finca en Girardot              (Mario) ACTIVA     MODERADA  reserva inmediata (SCRUM-95)
 --
 -- Reservas (SCRUM-38/41), una por cada estado que la app de verdad usa
 -- (no COMPLETADA: nada en el codigo la asigna todavia; una CONFIRMADA
@@ -186,9 +196,9 @@ SELECT pg_temp.publicacion_de_prueba(
     ARRAY['WiFi', 'Cocina equipada', 'Aire acondicionado'],
     ARRAY['No fumar dentro del apartamento', 'No se permiten fiestas', 'Check-in después de las 3 p. m.'],
     ARRAY['https://images.unsplash.com/photo-1769251846390-772c3a74b0da?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1632829401795-2745c905ac77?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1646592491820-49bafd614c0e?w=800&h=500&fit=crop&q=80']);
+          'https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'anfitrion@prueba.com', 'Casa campestre en Guatapé',
@@ -197,10 +207,10 @@ SELECT pg_temp.publicacion_de_prueba(
     350000, 80000, 'ACTIVA', 'MODERADA',
     ARRAY['WiFi', 'Piscina', 'Parqueadero', 'Cocina equipada', 'Lavadora'],
     ARRAY['Mascotas permitidas con aviso previo', 'Silencio después de las 10 p. m.'],
-    ARRAY['https://images.unsplash.com/photo-1739372993408-71a330cfce04?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1747171979433-e027641bbe42?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1768488314310-3742b3c75579?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&h=500&fit=crop&q=80']);
+    ARRAY['https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1556909212-d5b604d0c90d?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'anfitrion@prueba.com', 'Cabaña en La Calera',
@@ -209,10 +219,10 @@ SELECT pg_temp.publicacion_de_prueba(
     220000, 30000, 'BORRADOR', 'ESTRICTA',
     ARRAY['WiFi'],
     ARRAY['Llevar ropa abrigada'],
-    ARRAY['https://images.unsplash.com/photo-1768488314310-3742b3c75579?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1759443602064-3b5e58ffa55d?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=500&fit=crop&q=80']);
+    ARRAY['https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1567016432779-094069958ea5?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1507652313519-d4e9174996dd?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'anfitrion2@prueba.com', 'Habitación en Chapinero',
@@ -221,10 +231,10 @@ SELECT pg_temp.publicacion_de_prueba(
     90000, 0, 'ACTIVA', 'FLEXIBLE',
     ARRAY['WiFi', 'Lavadora'],
     ARRAY['Solo una persona', 'No visitas después de las 9 p. m.'],
-    ARRAY['https://images.unsplash.com/photo-1632829401795-2745c905ac77?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1646592491820-49bafd614c0e?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1769251846390-772c3a74b0da?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&h=500&fit=crop&q=80']);
+    ARRAY['https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1618219740975-d40978bb7378?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1600566752355-35792bedcfea?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1632829401795-2745c905ac77?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'anfitrion2@prueba.com', 'Apartamento en Bocagrande',
@@ -233,9 +243,9 @@ SELECT pg_temp.publicacion_de_prueba(
     420000, 60000, 'PAUSADA', 'MODERADA',
     ARRAY['WiFi', 'Piscina', 'Aire acondicionado'],
     ARRAY['No fumar'],
-    ARRAY['https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1747171979433-e027641bbe42?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&h=500&fit=crop&q=80',
+    ARRAY['https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=800&h=500&fit=crop&q=80',
           'https://images.unsplash.com/photo-1646592491820-49bafd614c0e?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
@@ -245,11 +255,11 @@ SELECT pg_temp.publicacion_de_prueba(
     280000, 70000, 'ACTIVA', 'FLEXIBLE',
     ARRAY['WiFi', 'Parqueadero'],
     ARRAY['No se permiten fiestas', 'Mascotas con aviso previo'],
-    ARRAY['https://images.unsplash.com/photo-1562058256-22ee52fe4068?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1768011849522-6627ee0b4608?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1739372993408-71a330cfce04?w=800&h=500&fit=crop&q=80']);
+    ARRAY['https://images.unsplash.com/photo-1737472739898-3de33143be8b?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1605146769289-440113cc3d00?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1768488314310-3742b3c75579?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1759443602064-3b5e58ffa55d?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'anfitrion@prueba.com', 'Loft en Laureles',
@@ -258,10 +268,10 @@ SELECT pg_temp.publicacion_de_prueba(
     150000, 25000, 'ACTIVA', 'MODERADA',
     ARRAY['WiFi', 'Aire acondicionado', 'Lavadora'],
     ARRAY['No fumar dentro del loft'],
-    ARRAY['https://images.unsplash.com/photo-1769251846390-772c3a74b0da?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1632829401795-2745c905ac77?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1646592491820-49bafd614c0e?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&h=500&fit=crop&q=80']);
+    ARRAY['https://images.unsplash.com/photo-1560185007-c5ca9d2c014d?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'anfitrion2@prueba.com', 'Casa en Cali',
@@ -270,10 +280,10 @@ SELECT pg_temp.publicacion_de_prueba(
     250000, 50000, 'ACTIVA', 'MODERADA',
     ARRAY['WiFi', 'Parqueadero', 'Cocina equipada'],
     ARRAY['No mascotas'],
-    ARRAY['https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1719324923613-ff0884b031ed?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=500&fit=crop&q=80']);
+    ARRAY['https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1620626011761-996317b8d101?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'anfitrion2@prueba.com', 'Apartahotel en Santa Marta',
@@ -282,10 +292,10 @@ SELECT pg_temp.publicacion_de_prueba(
     310000, 45000, 'ACTIVA', 'FLEXIBLE',
     ARRAY['WiFi', 'Piscina', 'Aire acondicionado'],
     ARRAY['Check-out antes de las 11 a. m.'],
-    ARRAY['https://images.unsplash.com/photo-1767206106944-b46f13deb9d6?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1747171979433-e027641bbe42?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1632829401795-2745c905ac77?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1646592491820-49bafd614c0e?w=800&h=500&fit=crop&q=80']);
+    ARRAY['https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1600047509782-20d39509f26d?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1739372993408-71a330cfce04?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'mixto@prueba.com', 'Cabaña en Salento',
@@ -294,10 +304,10 @@ SELECT pg_temp.publicacion_de_prueba(
     230000, 35000, 'ACTIVA', 'FLEXIBLE',
     ARRAY['WiFi', 'Parqueadero'],
     ARRAY['Silencio después de las 9 p. m.'],
-    ARRAY['https://images.unsplash.com/photo-1768488314310-3742b3c75579?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1759443602064-3b5e58ffa55d?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=500&fit=crop&q=80']);
+    ARRAY['https://images.unsplash.com/photo-1719324923613-ff0884b031ed?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1507652313519-d4e9174996dd?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1556909212-d5b604d0c90d?w=800&h=500&fit=crop&q=80']);
 
 SELECT pg_temp.publicacion_de_prueba(
     'mixto@prueba.com', 'Apartamento en Bogotá',
@@ -306,10 +316,84 @@ SELECT pg_temp.publicacion_de_prueba(
     200000, 35000, 'ACTIVA', 'MODERADA',
     ARRAY['WiFi', 'Aire acondicionado'],
     ARRAY['No fiestas', 'No mascotas'],
-    ARRAY['https://images.unsplash.com/photo-1769251846390-772c3a74b0da?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1632829401795-2745c905ac77?w=800&h=500&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=500&fit=crop&q=80']);
+    ARRAY['https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1618219740975-d40978bb7378?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1600566752355-35792bedcfea?w=800&h=500&fit=crop&q=80']);
+
+-- Publicaciones nuevas (SCRUM-95), puramente aditivas: no las referencia
+-- ninguna reserva, reseña ni notificación de ejemplo.
+SELECT pg_temp.publicacion_de_prueba(
+    'anfitrion2@prueba.com', 'Apartamento en Cartagena',
+    'Apartamento renovado a una cuadra de las murallas, en pleno centro histórico.',
+    'APARTAMENTO', 4::SMALLINT, 'Cartagena', 'Calle del Arsenal # 8-45', 'Centro Histórico',
+    380000, 55000, 'ACTIVA', 'MODERADA',
+    ARRAY['WiFi', 'Aire acondicionado'],
+    ARRAY['No fiestas', 'Check-in después de las 2 p. m.'],
+    ARRAY['https://images.unsplash.com/photo-1468413253725-0d5181091126?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=800&h=500&fit=crop&q=80']);
+
+SELECT pg_temp.publicacion_de_prueba(
+    'mixto@prueba.com', 'Casa en Armenia',
+    'Casa campestre en el eje cafetero, rodeada de fincas y senderos.',
+    'CASA', 6::SMALLINT, 'Armenia', 'Vereda El Caimo, km 5', NULL,
+    210000, 40000, 'ACTIVA', 'FLEXIBLE',
+    ARRAY['WiFi', 'Parqueadero', 'Cocina equipada'],
+    ARRAY['Mascotas permitidas con aviso previo'],
+    ARRAY['https://images.unsplash.com/photo-1562058256-22ee52fe4068?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1556909212-d5b604d0c90d?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1507652313519-d4e9174996dd?w=800&h=500&fit=crop&q=80']);
+
+SELECT pg_temp.publicacion_de_prueba(
+    'anfitrion@prueba.com', 'Loft en Usaquén',
+    'Loft de un ambiente en Usaquén, a pasos del parque y sus restaurantes.',
+    'APARTAMENTO', 2::SMALLINT, 'Bogotá', 'Cra 6 # 119-30', 'Usaquén',
+    190000, 30000, 'ACTIVA', 'MODERADA',
+    ARRAY['WiFi', 'Aire acondicionado', 'Lavadora'],
+    ARRAY['No fumar dentro del loft'],
+    ARRAY['https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1567016432779-094069958ea5?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1600566752355-35792bedcfea?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1556909212-d5b604d0c90d?w=800&h=500&fit=crop&q=80']);
+
+SELECT pg_temp.publicacion_de_prueba(
+    'anfitrion2@prueba.com', 'Cabaña en San Gil',
+    'Cabaña rústica cerca a los ríos de San Gil, ideal para grupos de aventura.',
+    'CABANA', 4::SMALLINT, 'San Gil', 'Vía San Gil - Barichara, km 6', NULL,
+    170000, 25000, 'ACTIVA', 'FLEXIBLE',
+    ARRAY['WiFi', 'Parqueadero'],
+    ARRAY['Ideal para grupos de aventura', 'Silencio después de las 10 p. m.'],
+    ARRAY['https://images.unsplash.com/photo-1767206106944-b46f13deb9d6?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1620626011761-996317b8d101?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800&h=500&fit=crop&q=80']);
+
+SELECT pg_temp.publicacion_de_prueba(
+    'mixto@prueba.com', 'Apartamento en Manizales',
+    'Apartamento con vista a las montañas, cerca al centro de Manizales.',
+    'APARTAMENTO', 3::SMALLINT, 'Manizales', 'Av. Santander # 45-12', NULL,
+    160000, 28000, 'ACTIVA', 'MODERADA',
+    ARRAY['WiFi', 'Cocina equipada'],
+    ARRAY['No mascotas'],
+    ARRAY['https://images.unsplash.com/photo-1768011849522-6627ee0b4608?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1507652313519-d4e9174996dd?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&h=500&fit=crop&q=80']);
+
+SELECT pg_temp.publicacion_de_prueba(
+    'anfitrion@prueba.com', 'Finca en Girardot',
+    'Finca de clima cálido cerca al río Magdalena, con piscina y zona de BBQ.',
+    'FINCA', 12::SMALLINT, 'Girardot', 'Vereda Chicalá, km 4', NULL,
+    320000, 65000, 'ACTIVA', 'MODERADA',
+    ARRAY['WiFi', 'Piscina', 'Parqueadero', 'Aire acondicionado'],
+    ARRAY['Mascotas no permitidas', 'Uso de piscina bajo supervisión de un adulto'],
+    ARRAY['https://images.unsplash.com/photo-1575429198097-0414ec08e8cd?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&h=500&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1600047509782-20d39509f26d?w=800&h=500&fit=crop&q=80']);
 
 -- Casa campestre en Guatapé pasa a requerir aprobación del anfitrión,
 -- para que la reserva PENDIENTE_APROBACION de más abajo (y las
