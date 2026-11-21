@@ -44,8 +44,8 @@ export default function LayoutBase() {
     }
     return (
         <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-            <AppBar position="static" elevation={0}>
-                <Toolbar sx={{ gap: 1 }}>
+            <AppBar position="sticky" elevation={0}>
+                <Toolbar sx={{ gap: 1, minHeight: 72 }}>
                     <Typography
                         variant="h6"
                         component={RouterLink}
@@ -93,7 +93,7 @@ export default function LayoutBase() {
                     )}
                 </Toolbar>
             </AppBar>
-            <Container component="main" sx={{ py: 4, flexGrow: 1 }}>
+            <Container component="main" sx={{ py: { xs: 3, md: 5 }, flexGrow: 1 }}>
                 <Outlet />
             </Container>
         </Box>
