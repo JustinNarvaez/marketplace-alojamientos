@@ -81,6 +81,8 @@ export default function DetalleAlojamiento() {
     const [error, setError] = useState<string | null>(null)
     // SCRUM-46: al publicar una resena se vuelve a cargar el detalle (promedio y listado).
     const [recargas, setRecargas] = useState(0)
+    // SCRUM-94: foto grande de la galeria; vuelve a la portada con cada alojamiento nuevo.
+    const [fotoActiva, setFotoActiva] = useState(0)
     const { tieneRol } = usarSesion()
 
     useEffect(() => {
@@ -92,6 +94,10 @@ export default function DetalleAlojamiento() {
                 setError(e instanceof ErrorApi ? e.message : 'No pudimos cargar el alojamiento.')
             })
     }, [idPublicacion, recargas])
+
+    useEffect(() => {
+        setFotoActiva(0)
+    }, [idPublicacion])
 
     // Escenario 4: volver con el historial conserva la URL de la busqueda,
     // y con ella sus filtros. Si se entro directo (sin historial), va al inicio.
@@ -144,17 +150,39 @@ export default function DetalleAlojamiento() {
             </Box>
 
             {publicacion.imagenes.length > 0 && (
-                <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto' }}>
-                    {publicacion.imagenes.map((url, indice) => (
-                        <Box
-                            key={url}
-                            component="img"
-                            src={url}
-                            alt={`Imagen ${indice + 1} de ${publicacion.titulo}`}
-                            sx={{ height: 240, borderRadius: 2, objectFit: 'cover', flexShrink: 0 }}
-                        />
-                    ))}
-                </Box>
+                <Stack spacing={1}>
+                    <Box
+                        component="img"
+                        src={publicacion.imagenes[fotoActiva]}
+                        alt={`Imagen ${fotoActiva + 1} de ${publicacion.titulo}`}
+                        sx={{
+                            width: '100%', aspectRatio: { xs: '4 / 3', sm: '16 / 7' },
+                            borderRadius: 3, objectFit: 'cover', display: 'block',
+                        }}
+                    />
+                    {publicacion.imagenes.length > 1 && (
+                        <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto' }}>
+                            {publicacion.imagenes.map((url, indice) => (
+                                <Box
+                                    key={url}
+                                    component="img"
+                                    src={url}
+                                    alt={`Miniatura ${indice + 1} de ${publicacion.titulo}`}
+                                    onClick={() => setFotoActiva(indice)}
+                                    sx={{
+                                        width: 100, height: 72, borderRadius: 2, objectFit: 'cover',
+                                        flexShrink: 0, cursor: 'pointer',
+                                        outline: (t) => indice === fotoActiva ? `2px solid ${t.palette.secondary.main}` : 'none',
+                                        outlineOffset: 2,
+                                        opacity: indice === fotoActiva ? 1 : 0.7,
+                                        transition: 'opacity 0.15s',
+                                        '&:hover': { opacity: 1 },
+                                    }}
+                                />
+                            ))}
+                        </Box>
+                    )}
+                </Stack>
             )}
 
             <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', md: 'row' }, alignItems: 'flex-start' }}>
